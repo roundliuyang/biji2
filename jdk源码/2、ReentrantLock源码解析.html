@@ -1,0 +1,3040 @@
+<!DOCTYPE html>
+<!-- saved from url=(0050)http://blog.shangsw.com/archives/reentrantlockhtml -->
+<html lang="zh-CN" data-mode="light" class="" foxified=""><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>2、ReentrantLock源码解析</title>
+
+
+
+
+
+
+
+<meta name="renderer" content="webkit">
+ <meta name="format-detection" content="email=no">
+<meta name="format-detection" content="telephone=no">
+
+<meta http-equiv="Cache-Control" content="no-siteapp">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, shrink-to-fit=no, viewport-fit=cover">
+<meta name="keywords" content="ReentrantLock,Lock,锁,重入锁,Java重入锁,可重入锁,ReentrantLock原理,ReentrantLock源码">
+<meta name="description" content="">
+<meta name="author" content="林雷">
+<meta http-equiv="x-dns-prefetch-control" content="on">
+<meta name="site" content="http://blog.shangsw.com">
+<!-- OG -->
+<meta property="og:image" content="/upload/2022/05/6.jpg">
+<meta property="og:description" content="">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:site_name" content="林雷笔记">
+<meta property="og:url" content="http://blog.shangsw.com">
+<meta property="og:title" content="2、ReentrantLock源码解析 – 林雷笔记">
+<meta property="twitter:partner" content="ogwp">
+<!-- /OG -->  <link rel="shortcut icon" size="32x32" href="http://blog.shangsw.com/upload/2022/05/6.jpg">
+  <link rel="canonical" href="http://blog.shangsw.com/">
+  <link rel="apple-touch-icon" sizes="180x180" href="http://blog.shangsw.com/upload/2022/05/6.jpg">
+<style type="text/css">
+  @font-face {
+    font-family: "Joe Font";
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  html body {
+    --theme: #fb6c28;
+    --scroll-bar: #c0c4cc;
+    --loading-bar: var(--theme);
+    --img-max-width: 100%;
+    font-family: "Joe Font", "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, "sans-serif";
+    --res-url: '/themes/joe2.0';
+  }
+  html[data-mode='dark'] body {
+    --theme: #9999ff;
+    --scroll-bar: #666;
+    --loading-bar: var(--theme);
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scroll-bar);
+  }
+    html[data-mode="light"] body {
+      background-image: none;
+    }
+    html[data-mode="dark"] body {
+      background-image: none;
+    }
+</style>      <!-- 加载条 -->
+      <link rel="stylesheet" href="./2、ReentrantLock源码解析_files/nprogress.min.css">
+      <style>
+          #nprogress .bar {
+            height: 3px;
+            background: var(--loading-bar);
+          }
+          #nprogress .peg {
+            display: none;
+          }
+      </style>
+      <script src="./2、ReentrantLock源码解析_files/nprogress.min.js.下载"></script>
+  <link rel="preload stylesheet" as="style" href="http://blog.shangsw.com/themes/joe2.0/source/css/min/normalize.min.css?v=1.0.10"> 
+  <link rel="preload stylesheet" as="style" href="http://blog.shangsw.com/themes/joe2.0/source/lib/font-awesome/css/font-awesome.min.css?v=1.0.10"> 
+  <link rel="preload stylesheet" as="style" href="http://at.alicdn.com/t/font_2788564_crkap1ed9j5.css">
+  <link rel="preload stylesheet" as="style" href="http://blog.shangsw.com/themes/joe2.0/source/css/min/theme.min.css?v=1.0.10">
+  <style>
+    #Joe .joe_container {
+      max-width: 1320px;
+    }
+  </style>
+  <link rel="stylesheet" href="./2、ReentrantLock源码解析_files/qmsg.css">
+  <link rel="preload stylesheet" as="style" href="http://blog.shangsw.com/themes/joe2.0/source/lib/animate/animate.min.css">
+    <link rel="preload stylesheet" as="style" href="http://blog.shangsw.com/themes/joe2.0/source/lib/prism/prism.min.css?v=1.0.10">
+    <link rel="preload stylesheet" as="style" href="http://blog.shangsw.com/themes/joe2.0/source/lib/prism/themes/prism-one-dark.css?v=1.0.10">
+  <link rel="preload stylesheet" as="style" href="http://blog.shangsw.com/themes/joe2.0/source/css/min/global.min.css?v=1.0.10">
+    <link rel="preload stylesheet" as="style" href="http://blog.shangsw.com/themes/joe2.0/source/css/min/post.min.css?v=1.0.10">
+  <link rel="preload stylesheet" as="style" href="http://blog.shangsw.com/themes/joe2.0/source/css/min/responsive.min.css?v=1.0.10">
+  <link rel="stylesheet" href="./2、ReentrantLock源码解析_files/jquery.fancybox.min.css">
+    <script src="./2、ReentrantLock源码解析_files/jquery.min.js.下载"></script>
+    <meta name="generator" content="Halo 1.5.2">
+        <link rel="shortcut icon" type="images/x-icon" href="http://blog.shangsw.com/upload/2022/05/6.jpg">
+    
+        
+  </head>
+  <body>
+    <div id="Joe">
+<header class="joe_header">
+  <div class="joe_header__above topInDown fixed">
+    <div class="joe_container joe_header_container">
+      <i class="joe-font joe-icon-caidan joe_header__above-slideicon"></i>
+        <a title="林雷笔记" class="joe_header__above-logo" href="http://blog.shangsw.com/">
+          <img style="border-radius:4px" src="./2、ReentrantLock源码解析_files/7.jpg" onerror="Joe.errorImg(this)" alt="林雷笔记">
+        </a>
+      <nav class="joe_header__above-nav">
+                <a class="item" href="http://blog.shangsw.com/" target="_self" title="首页"><i class="m-icon joe-font joe-icon-shouye"></i>首页</a>
+                <div class="joe_dropdown" trigger="hover" placement="60px">
+                  <div class="joe_dropdown__link">
+                      <a class="item" style="cursor:default;" href="javascript:;" title="源码分析"><i class="m-icon joe-font joe-icon-huo"></i>源码分析</a>
+                    <i class="joe-font joe-icon-arrow-down joe_dropdown__link-icon" style="color:var(--main)"></i>
+                  </div>
+                  <nav class="joe_dropdown__menu" style="top: 60px;">
+                          <li>
+                            <a class="item" href="http://blog.shangsw.com/categories/java-concurrent" target="_self" title="Java并发框架源码">Java并发框架源码</a>
+                          </li>
+                          <li>
+                            <a class="item" href="http://blog.shangsw.com/categories/springboot-source" target="_self" title="SpringBoot源码">SpringBoot源码</a>
+                          </li>
+                          <li>
+                            <a class="item" href="http://blog.shangsw.com/categories/spring-source" target="_self" title="Spring源码">Spring源码</a>
+                          </li>
+                          <li>
+                            <a class="item" href="http://blog.shangsw.com/categories/mybatis-source" target="_self" title="MyBatis源码">MyBatis源码</a>
+                          </li>
+                  </nav>
+                </div>
+                <a class="item current" href="http://blog.shangsw.com/archives" target="_self" title="文章"><i class="m-icon joe-font joe-icon-shu"></i>文章</a>
+                <a class="item" href="http://blog.shangsw.com/s/about" target="_self" title="留言板"><i class="m-icon joe-font joe-icon-reply"></i>留言板</a>
+                <a class="item" href="http://blog.shangsw.com/links" target="_self" title="友链"><i class="m-icon joe-font joe-icon-faxian"></i>友链</a>
+      </nav>
+  <form class="joe_header__above-search" method="get" action="http://blog.shangsw.com/search">
+    <input maxlength="16" autocomplete="off" placeholder="请输入关键字..." name="keyword" value="" class="input" type="text">
+    <button type="submit" class="submit" aria-label="搜索按钮"><i class="joe-font joe-icon-search"></i></button>
+    <span class="icon"></span>
+      <nav class="result">
+          <a href="http://blog.shangsw.com/archives/redblacktreehtml" title="1、红黑树的原理及实现(C++)" class="item">
+            <span class="sort">1</span>
+            <span class="text">1、红黑树的原理及实现(C++)</span>
+          </a>
+          <a href="http://blog.shangsw.com/archives/javareferencehtml" title="2、Java引用深入研究" class="item">
+            <span class="sort">2</span>
+            <span class="text">2、Java引用深入研究</span>
+          </a>
+          <a href="http://blog.shangsw.com/archives/iohtml" title="1、I/O模型" class="item">
+            <span class="sort">3</span>
+            <span class="text">1、I/O模型</span>
+          </a>
+          <a href="http://blog.shangsw.com/archives/concurrenthashmaphtml" title="14、ConcurrentHashMap核心源码解析" class="item">
+            <span class="sort">4</span>
+            <span class="text">14、ConcurrentHashMap核心源码解析</span>
+          </a>
+          <a href="http://blog.shangsw.com/archives/threadlocalhtml" title="13、ThreadLocal线程局部变量" class="item">
+            <span class="sort">5</span>
+            <span class="text">13、ThreadLocal线程局部变量</span>
+          </a>
+      </nav>
+  </form>
+        <i class="joe-font joe-icon-search joe_header__above-searchicon"></i>
+    </div>
+  </div>
+
+  <div class="joe_header__slideout">
+    <div class="joe_header__slideout-wrap">
+      <img width="100%" height="150" class="joe_header__slideout-image" src="./2、ReentrantLock源码解析_files/author_bg.jpg" onerror="Joe.errorImg(this)" alt="侧边栏壁纸">
+      <div class="joe_header__slideout-author">
+        <img width="50" height="50" class="avatar ls-is-cached lazyloaded" data-src="/upload/2022/05/4.jpg" src="./2、ReentrantLock源码解析_files/4.jpg" onerror="Joe.errorImg(this)" alt="博主头像">
+        <div class="info">
+          <a class="link" href="http://blog.shangsw.com/" target="_blank" rel="noopener noreferrer nofollow">林雷<img class="level" src="./2、ReentrantLock源码解析_files/level_4.svg" onerror="Joe.errorImg(this)" alt="博主等级"></a>
+            <p class="motto joe_motto"> 斜月沉沉藏海雾，碣石潇湘无限路</p>
+        </div>
+      </div>
+      <ul class="joe_header__slideout-count">
+        <li class="item">
+          <i class="joe-font joe-icon-riji"></i>
+          <span>累计撰写 <strong>132</strong> 篇文章</span>
+        </li>
+        <li class="item">
+          <i class="joe-font joe-icon-remen"></i>
+          <span>累计创建 <strong>47</strong> 个标签</span>
+        </li>
+        <li class="item">
+          <i class="joe-font joe-icon-message"></i>
+          <span>累计收到 <strong>3</strong> 条评论</span>
+        </li>
+      </ul>
+      <ul class="joe_header__slideout-menu panel-box">
+        <li>
+          <a class="link panel in" href="http://blog.shangsw.com/archives/reentrantlockhtml#" rel="nofollow">
+          <span>栏目</span>
+          <i class="joe-font joe-icon-arrow-right"></i>
+          </a>
+          <ul class="slides panel-body panel-box panel-side-menu" style="display: block;">
+                    <li>
+                      <a class="link" href="http://blog.shangsw.com/" title="首页">首页</a>
+                    </li>
+                    <li>
+                      <div class="link panel">
+                        <a href="http://blog.shangsw.com/archives/reentrantlockhtml#" title="源码分析">源码分析</a>
+                        <i class="joe-font joe-icon-arrow-right"></i>
+                      </div>
+                      <ul class="slides panel-body">
+                                <li>
+                                  <a class="link" href="http://blog.shangsw.com/categories/java-concurrent" title="Java并发框架源码">Java并发框架源码</a>
+                                </li>
+                                <li>
+                                  <a class="link" href="http://blog.shangsw.com/categories/springboot-source" title="SpringBoot源码">SpringBoot源码</a>
+                                </li>
+                                <li>
+                                  <a class="link" href="http://blog.shangsw.com/categories/spring-source" title="Spring源码">Spring源码</a>
+                                </li>
+                                <li>
+                                  <a class="link" href="http://blog.shangsw.com/categories/mybatis-source" title="MyBatis源码">MyBatis源码</a>
+                                </li>
+                      </ul>
+                    </li>
+                    <li>
+                      <a class="link current" href="http://blog.shangsw.com/archives" title="文章">文章</a>
+                    </li>
+                    <li>
+                      <a class="link" href="http://blog.shangsw.com/s/about" title="留言板">留言板</a>
+                    </li>
+                    <li>
+                      <a class="link" href="http://blog.shangsw.com/links" title="友链">友链</a>
+                    </li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+    <div class="joe_header__searchout">
+      <div class="joe_container">
+        <div class="joe_header__searchout-inner">
+          <form class="joe_header__above-search-mobile" method="get" action="http://blog.shangsw.com/search">
+            <input maxlength="16" autocomplete="off" placeholder="请输入关键字..." name="keyword" value="" class="input" type="text">
+            <button type="submit" class="submit">搜索</button>
+          </form>
+              <div class="title">
+                <i class="joe-font joe-icon-cloud"></i>标签搜索
+              </div>
+              <ul class="cloud">
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/redblacktree" title="RedBlackTree">RedBlackTree</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/%E7%BA%A2%E9%BB%91%E6%A0%91" title="红黑树">红黑树</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/c" title="C++">C++</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/epoll" title="Epoll">Epoll</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/poll" title="Poll">Poll</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/select" title="Select">Select</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/nio" title="NIO">NIO</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/%E9%98%BB%E5%A1%9E%E9%98%9F%E5%88%97" title="阻塞队列">阻塞队列</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/aqs" title="AQS">AQS</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/%E5%B9%B6%E5%8F%91%E6%A1%86%E6%9E%B6" title="并发框架">并发框架</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/%E7%A0%81%E6%B5%81" title="码流">码流</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/%E5%9B%BE%E7%81%B5" title="图灵">图灵</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/mybatis%E6%BA%90%E7%A0%81" title="MyBatis源码">MyBatis源码</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/mybatis" title="MyBatis">MyBatis</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/springboot%E6%BA%90%E7%A0%81" title="SpringBoot源码">SpringBoot源码</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/spring%E6%BA%90%E7%A0%81" title="Spring源码">Spring源码</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/jdk%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90" title="JDK源码分析">JDK源码分析</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/%E7%BA%BF%E7%A8%8B%E6%B1%A0" title="线程池">线程池</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/xxl-job" title="XXL-JOB">XXL-JOB</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/netty" title="Netty">Netty</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/es" title="ES">ES</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/elasticsearch" title="Elasticsearch">Elasticsearch</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/%E5%85%AC%E5%85%B1api" title="公共API">公共API</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/%E5%BC%80%E6%94%BEapi" title="开放API">开放API</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/websocket" title="WebSocket">WebSocket</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/stomp" title="STOMP">STOMP</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/vpn" title="VPN">VPN</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/seata" title="Seata">Seata</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/%E5%88%86%E5%B8%83%E5%BC%8F%E4%BA%8B%E5%8A%A1" title="分布式事务">分布式事务</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/haproxy" title="HAProxy">HAProxy</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/shardingsphere" title="ShardingSphere">ShardingSphere</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/sharding-jdbc" title="Sharding-JDBC">Sharding-JDBC</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/java8%E6%96%B0%E7%89%B9%E6%80%A7" title="Java8新特性">Java8新特性</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/nginx" title="Nginx">Nginx</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/kubernetes" title="Kubernetes">Kubernetes</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/redis" title="Redis">Redis</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/rocketmq" title="RocketMQ">RocketMQ</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/oauth20" title="OAuth2.0">OAuth2.0</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/shadowsocks" title="Shadowsocks">Shadowsocks</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/springcloud" title="SpringCloud">SpringCloud</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/linux" title="Linux">Linux</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/git" title="Git">Git</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/docker" title="docker">docker</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/springsecurity" title="SpringSecurity">SpringSecurity</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/spring" title="Spring">Spring</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/java" title="Java">Java</a>
+                  </li>
+                  <li class="item">
+                    <a style="background:#F8D800" href="http://blog.shangsw.com/tags/%E6%8A%80%E6%9C%AF" title="技术">技术</a>
+                  </li>
+              </ul>
+        </div>
+      </div>
+    </div>
+
+  <div class="joe_header__toc">
+    <div class="joe_header__toc-wrap">
+      <div class="toc_top">
+        <h3>目 录<span>CONTENT</span></h3>      
+        <img width="100%" height="150" src="./2、ReentrantLock源码解析_files/context_bg.png" onerror="Joe.errorImg(this)" alt="文章目录">
+      </div>
+      <div id="js-toc-mobile" class="toc"></div>
+    </div>
+  </div>
+
+  <div class="joe_header__mask"></div>
+</header><div class="joe_container joe_bread">
+  <ul class="joe_bread__bread">
+    <li class="item">
+      <i class="joe-font joe-icon-shouye"></i>
+      <a href="http://blog.shangsw.com/" class="link" title="首页">首页</a>
+    </li>
+        <li class="line">/</li>
+        <li class="item">
+          <a class="link" href="http://blog.shangsw.com/categories/java-concurrent" title="Java并发框架源码">Java并发框架源码</a>
+        </li>
+    <li class="line">/</li>
+    <li class="item">正文</li>
+  </ul>
+</div>      <div class="joe_container joe_main_container page-post animated fadeIn">
+        <div class="joe_main joe_post">
+          <div class="joe_detail" data-status="PUBLISHED" data-cid="120" data-clikes="7" data-author="林雷">
+              <div class="joe_detail__category">
+                  <a href="http://blog.shangsw.com/categories/java-concurrent" class="item item-0" title="Java并发框架源码">Java并发框架源码</a>
+              </div>
+            <div class="joe_detail-wrapper">
+              <h1 class="joe_detail__title txt-shadow">2、ReentrantLock源码解析</h1>
+                <div class="joe_detail__count">
+                  <div class="joe_detail__count-information">
+                    <img width="35" height="35" class="avatar lazyloaded" src="./2、ReentrantLock源码解析_files/4.jpg" data-src="/upload/2022/05/4.jpg" onerror="Joe.errorImg(this)" alt="林雷">
+                    <div class="meta">
+                      <div class="author">
+                        <a class="link" href="http://blog.shangsw.com/s/about" title="林雷">林雷</a>
+                      </div>
+                      <div class="item">
+                        <span class="text">2023-05-02</span>
+                        <span class="line">/</span>
+                        <span class="text">0 评论</span>
+                        <span class="line">/</span>
+                        <span class="text">7 点赞</span>
+                        <span class="line">/</span>
+                        <span class="text">195 阅读</span>  
+                        <span class="line">/</span>
+                        <span class="text">9,429 字</span>
+                      </div>
+                    </div>
+                  </div>
+                  <time class="joe_detail__count-created" datetime="05/02">05/02</time>
+                </div>
+              <div class="joe_detail__overdue">
+              </div>
+              <article class="joe_detail__article animated fadeIn center-img">
+                <div id="post-inner">
+                    <p><span style="display: block;" data-fancybox="Joe" href="http://gateway.shangsw.com/open-api/static/images/01/20190417.jpg"><img src="./2、ReentrantLock源码解析_files/20190417.jpg" alt="20190417"></span></p>
+<h1 id="%E4%B8%80-reentrantlock%E6%80%BB%E8%A7%88" tabindex="-1">一 ReentrantLock总览</h1>
+<p>ReentrantLock，从字面上来看，表示可重入的锁。可重入其实很好理解，当一个线程获取对象锁之后，这个线程可以再次获取本对象的锁。synchronized也是可重入的，我们以synchronized为例，如下示例代码：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">public void test {
+	for (int i = 0; i &lt; 100; i++) {
+		synchronized(this) {
+		}
+	}
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p>ReentrantLock是一个可重入锁，底层使用的是AQS实现的一套锁机制。使用state资源，如果持有锁的线程重复获取锁时，它会将state状态进行递增，也就是类似一个锁计数的含义；当释放锁时，同时也释放了锁计数。如果上一个线程还没有完成任务，其他线程会进行入队阻塞等待的操作。</p>
+<h2 id="1.1-reentrantlock%E7%AE%80%E4%BB%8B" tabindex="-1">1.1 ReentrantLock简介</h2>
+<p>我们先看一下ReentrantLock的继承图：<br>
+<span style="display: block;" data-fancybox="Joe" href="http://blog.shangsw.com/upload/2023/05/ReentrantLock-1.1-1.png"><img src="./2、ReentrantLock源码解析_files/ReentrantLock-1.1-1.png" alt="ReentrantLock-1.1-1"></span></p>
+<p>ReentrantLock实现了Lock接口，<strong>Lock</strong> 接口是JUC中的顶级锁接口，Lock定义了Java中获取锁、释放锁的相关定义。而ReentrantLock实现了Lock接口，并对具体的方法进行了实现，基于AQS实现了公平锁和非公平锁（synchronized只是非公平锁）。在了解相关源码之前，我们对ReentrantLock与synchronized关键字进行比较一下，如下所示：</p>
+<table>
+<thead>
+<tr>
+<th>对比点</th>
+<th>ReentrantLock</th>
+<th>synchronized</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>锁实现机制</td>
+<td>依赖AQS, 底层使用AQS实现</td>
+<td>监视器模式（monitor对象）</td>
+</tr>
+<tr>
+<td>灵活性</td>
+<td>支持响应超时、中断等</td>
+<td>不灵活</td>
+</tr>
+<tr>
+<td>加锁形式</td>
+<td>必须显示调用lock()方法加锁</td>
+<td>自动隐式获取监视器</td>
+</tr>
+<tr>
+<td>释放锁形式</td>
+<td>必须显示调用unlock()方法释放锁</td>
+<td>自动隐式释放监视器</td>
+</tr>
+<tr>
+<td>锁类型</td>
+<td>公平锁、非公平锁。默认非公平锁</td>
+<td>非公平锁</td>
+</tr>
+<tr>
+<td>条件队列</td>
+<td>可关联多个条件队列</td>
+<td>关联一个条件队列</td>
+</tr>
+<tr>
+<td>可重入性</td>
+<td>可重入</td>
+<td>可重入</td>
+</tr>
+</tbody>
+</table>
+<h3 id="1.1.1-lock%E6%8E%A5%E5%8F%A3" tabindex="-1">1.1.1 Lock接口</h3>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 锁
+ */
+public interface Lock {
+    /**
+     * 获取锁
+     */
+    void lock();
+
+    /**
+     * 获取锁
+     * InterruptedException异常
+     * @throws InterruptedException 异常
+     */
+    void lockInterruptibly() throws InterruptedException;
+
+    /**
+     * 获取锁
+     * @return 是否获取成功
+     */
+    boolean tryLock();
+
+    /**
+     * 同上述的{@link #tryLock()}, 获取锁, 这里指定了锁的时长
+     * @param time 时长
+     * @param unit 单位
+     * @return 是否获取成功
+     * @throws InterruptedException 异常
+     */
+    boolean tryLock(long time, TimeUnit unit) throws InterruptedException;
+
+    /**
+     * 释放锁
+     */
+    void unlock();
+
+    /**
+     * 创建一个Condition对象
+     * @return Condition
+     */
+    Condition newCondition();
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p><strong>Lock接口定义了获取锁、释放锁以及创建条件队列的相关定义</strong>，接下来分析ReentrantLock源码，我们会从具体的加锁、释放锁、创建条件队列等方法入手，从而分析ReentrantLock的具体代码实现思路。</p>
+<h1 id="%E4%BA%8C-reentrantlock%E6%BA%90%E7%A0%81" tabindex="-1">二 ReentrantLock源码</h1>
+<h2 id="2.1-aqs%E7%9A%84%E5%AE%9E%E7%8E%B0%E7%B1%BBsync" tabindex="-1">2.1 AQS的实现类Sync</h2>
+<p>在ReentrantLock中，只有一个全局变量：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/** 同步器 */
+private final Sync sync;
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p><strong>Sync是ReentrantLock抽象的内部类</strong>，如下，是其相关继承图：<br>
+<span style="display: block;" data-fancybox="Joe" href="http://blog.shangsw.com/upload/2023/05/ReentrantLock-2.1-1.png"><img src="./2、ReentrantLock源码解析_files/ReentrantLock-2.1-1.png" alt="ReentrantLock-2.1-1"></span><br>
+Sync是实现了AQS的相关方法的实现类，其具体实现有<strong>FairSync（公平队列）和NonfairSync（非公平队列）</strong>。ReentrantLock的lock()、unlock()等相关接口的实现都是调用Sync相关方法实现的。而公平锁和非公平锁就是对应的Sync的实现。</p>
+<ul>
+<li>公平锁：当有多个线程获取锁的时候，没有获取到锁的线程会存储到同步队列的队尾。当有新的线程要获取锁，并不直接获取锁，而是直接进入同步队列队尾排队；当占有锁的线程释放锁的时候，会从队头唤醒一个线程占用锁资源。所以说获取锁的过程是公平的</li>
+<li>非公平锁：当多个线程获取锁的时候，其他线程没有获取到锁会进入同步队列排队；但是此时如果有新的线程来获取锁时，就会先去获取锁，获取到了则占用；获取不到才会进入同步队列排队，即不管同步队列有没有等待的线程都会直接获取。就出现了"后到也会先得"的情况，所以说是非公平的</li>
+</ul>
+<p>在Sync类中，有一个空方法lock()， 用于获取锁用的，留给子类覆写：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 基础的同步器。子类有公平的和非公平的实现, 使用AQS的state控制持有的锁
+ */
+abstract static class Sync extends AbstractQueuedSynchronizer {
+    private static final long serialVersionUID = -5179523762034025860L;
+
+    /**
+     * 获取锁{@link Lock#lock()}
+     */
+    abstract void lock();
+    
+    ......
+}    
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p>ReentrantLock有两个构造方法：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 构造器。默认为非公平锁
+ */
+public ReentrantLock() {
+    sync = new NonfairSync();
+}
+
+/**
+ * 构造器。通过参数控制是否是公平锁
+ * @param fair 是否使用公平队列
+ */
+public ReentrantLock(boolean fair) {
+    sync = fair ? new FairSync() : new NonfairSync();
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p>默认的构造方法创建的同步队列是NonfairSync（非公平队列），也可以通过参数fair指定使用公平队列还是非公平队列。</p>
+<h2 id="2.2-lock%E5%8A%A0%E9%94%81" tabindex="-1">2.2 lock加锁</h2>
+<p>我们先看<strong>ReentrantLock.lock()</strong> 方法：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 获取锁:
+ * 1、如果该锁没有被另一个线程持有, 则获取该锁并立即返回, 将锁的保持计数设置为1
+ * 2、如果当前线程已经保持该锁, 则将保持计数+1, 并且该方法立即返回
+ * 3、如果该锁被另一个线程持有, 则出于线程调度的目的, 禁用当前线程, 并且在获得锁之前, 该线程将一直出于休眠状态, 此时锁保持计数被设置为1
+ */
+public void lock() {
+    sync.lock();
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p>ReentrantLock的lock()方法核心逻辑委托给了<strong>Sync.lock()</strong>，而我们通过上文知道Sync.lock()是一个空方法，主要的逻辑其实是在其子类<strong>FairSync</strong>和<strong>NonfairSync</strong>中。下面我们分别看看公平队列和非公平队列的实现</p>
+<h3 id="2.2.1-%E5%85%AC%E5%B9%B3%E9%94%81" tabindex="-1">2.2.1 公平锁</h3>
+<p>我们首先看看公平锁的实现方式：<strong>FairSync.lock()</strong> 代码如下：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 获取锁。
+ */
+final void lock() {
+    acquire(1);
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p><strong>FairSync.lock()加锁的逻辑其实直接是调用AQS中的acquire()方法来获取的</strong>，而我们在 <a href="http://blog.shangsw.com/archives/aqshtml#2.1-acquire%E8%8E%B7%E5%8F%96%E9%94%81" target="_blank" rel="noopener noreferrer nofollow">1、AbstractQueuedSynchronizer原理分析-2.1 acquire获取锁</a> 中已经介绍了该方法的具体逻辑，在AbstractQueuedSynchronizer.acquire()中主要是调用tryAcquire()来获取锁的，我们直接看<strong>FairSync.tryAcquire()</strong> 的实现：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+     * 获取锁
+     * @param acquires 锁计数器
+     * @return true/false
+     */
+    protected final boolean tryAcquire(int acquires) {
+        final Thread current = Thread.currentThread();//当前线程
+        int c = getState();//锁计数器
+        if (c == 0) {//没有其他线程持有锁, 这state为0
+            if (!hasQueuedPredecessors() &amp;&amp;//同步队列中没有有效节点
+                    compareAndSetState(0, acquires)) {
+                setExclusiveOwnerThread(current);//设置线程
+                return true;//返回true
+            }
+        } else if (current == getExclusiveOwnerThread()) {//当前线程持有的锁, 重入
+            int nextc = c + acquires;//增加计数器
+            if (nextc &lt; 0)//不能小于0
+                throw new Error("Maximum lock count exceeded");
+            setState(nextc);//设置state
+            return true;//返回true
+        }
+        return false;//有其他线程持有锁
+    }
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p>从这里可以看出，公平锁的加锁流程如下：<br>
+<span style="display: block;" data-fancybox="Joe" href="http://blog.shangsw.com/upload/2023/05/ReentrantLock-2.2.1-1.png"><img src="./2、ReentrantLock源码解析_files/ReentrantLock-2.2.1-1.png" alt="ReentrantLock-2.2.1-1"></span></p>
+<p>在<strong>ReentrantLock.FairSync.tryAcquire()</strong> 尝试获取锁的逻辑中中，主要通过<strong>state是否为0判断是否有线程占用锁资源</strong>，具体流程如下：</p>
+<ul>
+<li>如果state等于0，再通过AbstractQueuedSynchronizer.hasQueuedPredecessors()方法（具体可以看 <a href="http://blog.shangsw.com/archives/aqshtml#2.7-hasqueuedpredecessors%E6%A3%80%E6%B5%8B%E5%90%8C%E6%AD%A5%E9%98%9F%E5%88%97%E4%B8%AD%E6%98%AF%E5%90%A6%E5%AD%98%E5%9C%A8%E6%9C%89%E6%95%88%E7%9A%84%E8%8A%82%E7%82%B9" target="_blank" rel="noopener noreferrer nofollow">1、AbstractQueuedSynchronizer原理分析-2.7 hasQueuedPredecessors检测同步队列中是否存在有效的节点</a>）判断同步队列中是否不存在有效的节点，如果存在有效的节点证明已经有线程正在占用资源（但是占用的流程还没有完成），所以会直接返回false；如果不存在有效的节点，然后通过CAS将state值从0改变为指定的值，最后设置当前线程为占用锁的线程并返回true</li>
+<li>如果state不等于0，那么证明一定有线程占用锁资源，而对于公平队列来说，如果有线程占用锁资源的话，是需要进入同步阻塞等待队列的；但是ReentrantLock本身是可重入的锁，所以这里判断占用锁的线程是否是当前线程，如果是的话，那么对state进行增加的操作，表示可重入。并返回true</li>
+<li>如果state不等于0，并且占用锁的线程也不是当前线程，那么直接返回false</li>
+</ul>
+<p>而通过<a href="http://blog.shangsw.com/archives/aqshtml#2.1-acquire%E8%8E%B7%E5%8F%96%E9%94%81" target="_blank" rel="noopener noreferrer nofollow">1、AbstractQueuedSynchronizer原理分析-2.1 acquire获取锁</a>  部分我们知道，如果<strong>tryAcquire()返回false的话，那么就将当前线程存放到同步队列的队尾并阻塞</strong>。所以这里的公平锁加锁逻辑就是如果有线程占用state锁资源的话，并且抢占锁的线程不是占用锁的线程，那么就等待阻塞了。</p>
+<h3 id="2.2.2-%E9%9D%9E%E5%85%AC%E5%B9%B3%E9%94%81" tabindex="-1">2.2.2 非公平锁</h3>
+<p>非公平锁<strong>NonfairSync.lock()</strong> 代码如下：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 获取锁。
+ */
+final void lock() {
+    if (compareAndSetState(0, 1))//通过CAS将state置为1(原state值必须为0, 即没有线程持有锁, 否则CAS失败)
+        setExclusiveOwnerThread(Thread.currentThread());//设置线程
+    else//通过CAS将state置为1失败, 即其他线程已经持有锁了
+        acquire(1);//调用acquire()获取锁
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p>可以看到，<strong>在NonfairSync.lock()代码中，一开始就通过CAS将state值从0改变为1，如果改变成功，就认为没有其他线程占用锁资源；而改变失败，证明state值已经不是0了，就会调用AbstractQueuedSynchronizer.acquire()方法</strong>，在acquire()方法的主要逻辑是在tryAcqiure()中，我们看<strong>NonfairSync.tryAcquire()</strong> 的实现：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 获取锁
+ * @param acquires 锁计数器
+ * @return true/false
+ */
+protected final boolean tryAcquire(int acquires) {
+    return nonfairTryAcquire(acquires);
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 执行非公平的tryLock
+ * @param acquires 锁的持有计数
+ * @return 是否获取成功
+ */
+final boolean nonfairTryAcquire(int acquires) {
+    final Thread current = Thread.currentThread();//当前线程
+    int c = getState();//获取state值
+    if (c == 0) {//没有线程持有当前锁
+        if (compareAndSetState(0, acquires)) {//使用CAS将state更新
+            setExclusiveOwnerThread(current);//设置线程
+            return true;//返回true
+        }
+    } else if (current == getExclusiveOwnerThread()) {//有线程持有, 判断是否是同一个线程(重入性)
+        int nextc = c + acquires;//计数器增加
+        if (nextc &lt; 0) // overflow
+            throw new Error("Maximum lock count exceeded");
+        setState(nextc);//直接设置值
+        return true;//返回true
+    }
+    return false;//有其他线程持有锁, 直接返回false
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p>这里的<strong>nonfairTryAcquire(int)的加锁流程与上述公平锁的FairSync.tryAcquire()的加锁流程类似</strong>，但是有一些区别。所以这里我们可以知道非公平锁加锁流程如下：<br>
+<span style="display: block;" data-fancybox="Joe" href="http://blog.shangsw.com/upload/2023/05/ReentrantLock-2.2.2-1.png"><img src="./2、ReentrantLock源码解析_files/ReentrantLock-2.2.2-1.png" alt="ReentrantLock-2.2.2-1"></span></p>
+<p><strong>NonfairSync加锁流程，一开始就直接抢占锁，而不关心是否有线程占用锁</strong>；如果抢占失败，就会进入acquire()分支，而NonfairSync.tryAcquire()的逻辑与FairSync.tryAcquire()逻辑类似，但是去除了<strong>hasQueuedPredecessors()</strong> 的判断，这里我们不做详细介绍了。<br>
+<strong>不管是公平锁还是非公平锁，如果抢占锁失败，都会进入同步队列的队尾，并且被阻塞；只有线程释放锁之后，才会唤醒同步队列的线程</strong>。</p>
+<h2 id="2.3-lockinterruptibly%E5%8F%AF%E4%B8%AD%E6%96%AD%E5%BC%8F%E8%8E%B7%E5%8F%96%E9%94%81" tabindex="-1">2.3 lockInterruptibly可中断式获取锁</h2>
+<p><strong>ReentrantLock.lockInterruptibly()</strong> 代码如下：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 获取锁
+ * 1、如果当前线程未被中断, 则获取锁
+ * 2、如果该锁没有被另一个线程持有, 则获取锁并立即返回, 将锁的保持计数置为1
+ * 3、如果当前线程已经保持此锁, 则将保持计数+1, 并且该方法立即返回
+ * 4、如果锁被另一个线程持有, 则出于线程调度目的, 禁用当前线程, 并且在发生以下两种情况之一以前, 该线程将一直出于休眠状态:
+ *      4.1 锁由当前线程获得
+ *      4.2 其他某个线程中断当前线程
+ * 5、如果当前线程获得该锁, 则将锁保持计数设置为1。如果当前线程在进入此方法时已经设置了该线程的中断状态或者在等待锁的同时被中断则抛出
+ * InterruptedException异常
+ * @throws InterruptedException 异常
+ */
+public void lockInterruptibly() throws InterruptedException {
+    sync.acquireInterruptibly(1);
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p>这里直接调用<strong>AbstractQueuedSynchronizer.acquireInterruptibly()</strong> 方法：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 独占的方式获取锁, 如果中断则终止。
+ * @param arg 计数器
+ * @throws InterruptedException 异常.如果当前线程是
+ */
+public final void acquireInterruptibly(int arg) throws InterruptedException {
+    if (Thread.interrupted())//线程中断则抛出异常并清除中断的标识位
+        throw new InterruptedException();
+    if (!tryAcquire(arg))//获取锁失败
+        doAcquireInterruptibly(arg);
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p><strong>主要就是如果线程出现了中断信号，那么就会抛出InterruptedException异常</strong>；如果没有出现中断信号，那么逻辑与AbstractQueuedSynchronizer.acquire()逻辑一样，这里不做过多介绍了</p>
+<h2 id="2.4-trylock%E5%B0%9D%E8%AF%95%E8%8E%B7%E5%8F%96%E9%94%81" tabindex="-1">2.4 tryLock尝试获取锁</h2>
+<p><strong>tryLock()</strong> 尝试添加锁：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 获取锁:
+ * 1、如果该锁没有被另一个线程持有, 则立即返回true, 并将线程的保持计数设置为1
+ * 2、如果当前线程已经持有此锁, 则将保持计数加1, 该方法返回true
+ * 3、如果锁被另一个线程持有, 则此方法立即返回false
+ * @return 是否获取成功
+ */
+public boolean tryLock() {
+    return sync.nonfairTryAcquire(1);
+}
+
+/**
+ * 同上述的{@link #tryLock()}, 获取锁, 这里指定了锁的时长
+ * @param timeout 时长
+ * @param unit 单位
+ * @return 是否获取成功
+ * @throws InterruptedException 异常
+ */
+public boolean tryLock(long timeout, TimeUnit unit) throws InterruptedException {
+    return sync.tryAcquireNanos(1, unit.toNanos(timeout));
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p>tryLock()主要是尝试获取锁，主要的逻辑还是在<strong>tryAcquire()</strong> 中，tryLock()方法我们在使用的时候，可以拿到返回值，通过返回值可以做一些业务操作。</p>
+<h2 id="2.5-unlock%E9%87%8A%E6%94%BE%E9%94%81" tabindex="-1">2.5 unlock释放锁</h2>
+<p><strong>ReentrantLock.unlock()</strong> 代码如下：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 释放锁
+ */
+public void unlock() {
+    sync.release(1);
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p>这里直接调用的是<strong>AbstractQueuedSynchronizer.release()</strong> 方法，而在 <a href="http://blog.shangsw.com/archives/aqshtml#2.2-release%E9%87%8A%E6%94%BE%E9%94%81" target="_blank" rel="noopener noreferrer nofollow">1、AbstractQueuedSynchronizer原理分析-2.2 release释放锁</a>  中我们已经介绍过了，主要释放的逻辑是在<strong>tryRelease()</strong> 方法中，如果返回true则唤醒同步队列的队头线程（head.next节点）。unlock()执行流程如下：<br>
+<span style="display: block;" data-fancybox="Joe" href="http://blog.shangsw.com/upload/2023/05/ReentrantLock-2.5-1.png"><img src="./2、ReentrantLock源码解析_files/ReentrantLock-2.5-1.png" alt="ReentrantLock-2.5-1"></span></p>
+<p>在<strong>ReentrantLock.Sync.tryRelease()</strong> 方法如下：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 尝试释放锁
+ * @param releases 锁的持有计数
+ * @return 是否释放成功
+ */
+protected final boolean tryRelease(int releases) {
+    int c = getState() - releases;//线程计数器减去
+    if (Thread.currentThread() != getExclusiveOwnerThread())//不是同一个线程(其他线程释放当前线程的锁是不可行的)
+        throw new IllegalMonitorStateException();//抛出异常
+    boolean free = false;//当前是否已经完全释放锁
+    if (c == 0) {//state为0表示没有线程持有锁
+        free = true;//置为true
+        setExclusiveOwnerThread(null);//没有线程持有锁, 锁着这里将thread置为空
+    }
+    setState(c);//设置state
+    return free;//返回
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p><strong>ReentrantLock.Sync.tryRelease()</strong> 执行流程如下：<br>
+<span style="display: block;" data-fancybox="Joe" href="http://blog.shangsw.com/upload/2023/05/ReentrantLock-2.5-2.png"><img src="./2、ReentrantLock源码解析_files/ReentrantLock-2.5-2.png" alt="ReentrantLock-2.5-2"></span></p>
+<p>这里会将锁计数器减去，并且判断当前线程是否是独占锁的线程，如果不是的话，那么就是从其他线程释放占有锁的线程的锁，不符合ReentrantLock独占锁的逻辑，所以会抛出异常。最后将state锁计数更新提交。<br>
+到这里其实已经介绍完了ReentrantLock的主要的逻辑了，接下来我们看一下一些辅助的方法逻辑</p>
+<h2 id="2.6-%E5%85%B6%E4%BB%96%E6%96%B9%E6%B3%95" tabindex="-1">2.6 其他方法</h2>
+<h3 id="2.6.1-%E5%88%9B%E5%BB%BA%E6%9D%A1%E4%BB%B6%E7%AD%89%E5%BE%85%E9%98%9F%E5%88%97" tabindex="-1">2.6.1 创建条件等待队列</h3>
+<p><strong>newCondition()</strong> 代码如下：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 创建一个Condition对象。这里使用的是ConditionObject对象
+ * @return Condition
+ */
+public Condition newCondition() {
+    return sync.newCondition();
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p>直接通过Sync.newCondition()方法创建，而Sync.newCondition创建的是ConditionObject对象，ConditionObject对象是AbstractQueuedSynchronizer的内部类，我们在 <a href="http://blog.shangsw.com/archives/aqshtml#3.1-aqs%E4%B8%AD%E7%9A%84conditionobject" target="_blank" rel="noopener noreferrer nofollow">1、AbstractQueuedSynchronizer原理分析-3.1 AQS中的ConditionObject</a>  已经详细介绍过了，这里不做重复介绍。</p>
+<h3 id="2.6.2-%E5%88%A4%E6%96%AD%E6%98%AF%E5%90%A6%E6%9C%89%E7%BA%BF%E7%A8%8B%E6%8C%81%E6%9C%89%E9%94%81" tabindex="-1">2.6.2 判断是否有线程持有锁</h3>
+<p><strong>isLocked()</strong> 代码如下：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 是否是锁住的状态。即判断state值不为0表示有线程持有锁
+ * @return true: 有线程持有锁; false: 没有线程持有锁
+ */
+public boolean isLocked() {
+    return sync.isLocked();
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 是否是锁住的状态。即判断state值不为0表示有线程持有锁
+ * @return true: 有线程持有锁; false: 没有线程持有锁
+ */
+final boolean isLocked() {
+    return getState() != 0;
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p>通过state是否不为0判断。</p>
+<h3 id="2.6.3-%E8%8E%B7%E5%8F%96%E6%8C%81%E6%9C%89%E9%94%81%E7%9A%84%E7%BA%BF%E7%A8%8B" tabindex="-1">2.6.3 获取持有锁的线程</h3>
+<p><strong>getOwner()</strong> 代码如下：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 如果锁没有被任何线程持有则返回空, 否则返回独占锁的线程
+ * @return Thread
+ */
+protected Thread getOwner() {
+    return sync.getOwner();
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 如果锁没有被任何线程持有则返回空, 否则返回独占锁的线程
+ * @return Thread
+ */
+final Thread getOwner() {
+    return getState() == 0 ? null : getExclusiveOwnerThread();
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p>如果state为0证明已经没有线程持有锁了，所以返回为null；否则返回占有锁的线程。</p>
+<h3 id="2.6.4-%E8%8E%B7%E5%8F%96%E5%90%8C%E6%AD%A5%E9%98%9F%E5%88%97%E7%9A%84%E9%95%BF%E5%BA%A6" tabindex="-1">2.6.4 获取同步队列的长度</h3>
+<p><strong>getQueueLength()</strong> 代码如下：</p>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 获取队列同步器的长度
+ * @return 长度
+ */
+public final int getQueueLength() {
+    return sync.getQueueLength();
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<div class="code-toolbar"><pre class="c_title c_hr c_macdot c_hover_tools c_copy language-none" tabindex="0"><code class="language- language-none">/**
+ * 获取队列的长度
+ * @return 长度
+ */
+public final int getQueueLength() {
+    int n = 0;
+    for (AbstractQueuedSynchronizer.Node p = tail; p != null; p = p.prev) {//从tail一直往head遍历(head的prev为null)
+        if (p.thread != null)//不为空则自加
+            ++n;
+    }
+    return n;
+}
+</code><span class="copy-button"><i class="joe-font joe-icon-copy" title="复制代码"></i></span></pre><div class="toolbar"><div class="toolbar-item"><span data-rel="Plain text"></span></div><div class="toolbar-item"><button class="copy-to-clipboard-button" type="button" data-copy-state="copy" data-rel="复制"></button></div></div></div>
+<p>是直接通过AQS.getQueueLength()获取的，在AQS.getQueueLength()中主要就是从尾部往头部遍历去找的，所以这个方法可能比较耗时。<br>
+而对于ReentrantLock中的其他方法可自行阅读源码，相对来说，ReentrantLock的源码还是很简单的，没有复杂的逻辑，底层主要是AQS的实现。</p>
+
+                </div>
+              </article>
+    <div class="joe_detail__agree" style="display: none;">
+      <div class="agree">
+        <div class="icon">
+          <i class="joe-font joe-icon-like icon-like active"></i>
+          <i class="joe-font joe-icon-like-fill icon-unlike"></i>
+        </div>
+        <span class="nums">7</span>
+      </div>
+    </div>
+            </div>
+<div class="joe_detail__operate">
+  <div class="joe_detail__operate-tags">
+            <a href="http://blog.shangsw.com/tags/%E6%8A%80%E6%9C%AF">技术</a>
+        <a href="http://blog.shangsw.com/tags/jdk%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90">JDK源码分析</a>
+        <a href="http://blog.shangsw.com/tags/%E5%B9%B6%E5%8F%91%E6%A1%86%E6%9E%B6">并发框架</a>
+        <a href="http://blog.shangsw.com/tags/aqs">AQS</a>
+  </div>
+    <div class="joe_detail__operate-share" style="display: none;">
+      <i class="joe-font joe-icon-share"></i>
+      <div class="share-icon-list">
+          <a class="icon-share-link" href="javascript:;" rel="noopener noreferrer" title="复制文章链接">
+            <svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="3509" width="30" height="30"><path d="M515.2 64c-246.4 0-448 198.4-448 444.8S268.8 953.6 512 953.6c246.4 0 444.8-201.6 444.8-444.8S758.4 64 515.2 64z m-118.4 441.6c-9.6 9.6-28.8 9.6-41.6 0l-22.4-25.6-12.8-9.6c-19.2-22.4-32-48-35.2-76.8 0-28.8 9.6-57.6 28.8-76.8 22.4-19.2 48-28.8 76.8-28.8 28.8 0 60.8 12.8 83.2 35.2l86.4 86.4c22.4 22.4 35.2 51.2 35.2 80 0 25.6-9.6 51.2-28.8 70.4-9.6 9.6-28.8 9.6-41.6 0-9.6-9.6-9.6-28.8 0-38.4 19.2-19.2 16-51.2-3.2-73.6l-86.4-86.4c-12.8-12.8-25.6-19.2-41.6-19.2-9.6 0-22.4 3.2-32 12.8-12.8 12.8-12.8 25.6-12.8 35.2 0 12.8 6.4 28.8 19.2 38.4l12.8 12.8 22.4 22.4c3.2 12.8 3.2 28.8-6.4 41.6z m307.2 201.6c-19.2 19.2-44.8 28.8-73.6 28.8-28.8 0-60.8-12.8-83.2-35.2l-86.4-86.4c-22.4-22.4-35.2-51.2-35.2-80 0-25.6 9.6-51.2 28.8-70.4 9.6-9.6 28.8-9.6 41.6 0 9.6 9.6 9.6 28.8 0 38.4-19.2 19.2-16 51.2 3.2 73.6l86.4 86.4c12.8 12.8 25.6 19.2 41.6 19.2 9.6 0 22.4-3.2 32-12.8 12.8-12.8 12.8-25.6 12.8-35.2 0-12.8-6.4-28.8-19.2-38.4l-25.6-25.6-9.6-9.6c-9.6-9.6-9.6-28.8 0-38.4 9.6-9.6 28.8-9.6 41.6 0l12.8 12.8 19.2 19.2c22.4 19.2 35.2 48 35.2 73.6 9.6 32-3.2 57.6-22.4 80z" fill="#989b9e"></path></svg>
+          </a>
+          <a href="http://service.weibo.com/share/share.php?sharesource=weibo&amp;title=%E5%88%86%E4%BA%AB%EF%BC%9A2%E3%80%81ReentrantLock%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90%EF%BC%8C%E5%8E%9F%E6%96%87%E9%93%BE%E6%8E%A5%EF%BC%9Ahttp://blog.shangsw.com/archives/reentrantlockhtml&amp;pic=http://gateway.shangsw.com/open-api/static/images/01/20190417.jpg" target="_blank" rel="noopener noreferrer" title="分享到新浪微博">
+            <svg class="icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
+              <path d="M480.8 457.76a271.04 271.04 0 0 0-37.28 2.72c-96 13.44-166.72 75.04-157.92 137.44s93.6 101.92 189.6 88.48 166.72-75.04 157.92-137.44c-7.68-54.08-73.12-91.04-152.32-91.2zm-23.36 211.52a122.08 122.08 0 0 1-24 2.4c-48 0-88-27.52-96-68.32-9.28-48 29.44-95.2 86.56-106.24s110.88 18.4 120 66.08-29.44 95.04-86.56 106.08z" fill="#F56467"></path>
+              <path d="M512 73.28A438.72 438.72 0 1 0 950.72 512 438.72 438.72 0 0 0 512 73.28zm-43.84 666.88c-150.24 0-272-78.56-272-176S378.56 314.72 448 314.72c29.28 0 86.56 21.76 46.4 90.88a246.24 246.24 0 0 0 34.08-10.08c32-9.12 76.96-18.24 107.68 0 51.04 29.6 0 77.12 0 82.4s102.4 5.28 102.4 87.2c.32 96.48-120.16 175.04-270.4 175.04zm213.76-358.88a56 56 0 0 0-47.2-16 16.96 16.96 0 0 1-17.28-14.4 12.16 12.16 0 0 0 0 2.4v-4.8a12.16 12.16 0 0 0 0 2.4 20.48 20.48 0 0 1 17.28-17.28 77.28 77.28 0 0 1 68.32 18.56c32 28.48 18.72 75.68 18.72 75.68a21.28 21.28 0 0 1-20.48 17.28h-1.76a12.48 12.48 0 0 1-12.8-16.8 49.44 49.44 0 0 0-4.8-47.04zm120.16 60.64A29.6 29.6 0 0 1 776 467.84a22.08 22.08 0 0 1-19.68-25.92A139.2 139.2 0 0 0 736 336c-34.88-50.08-109.92-41.28-109.92-41.28A26.24 26.24 0 0 1 599.84 272v2.88-5.6V272a26.56 26.56 0 0 1 26.24-23.52 188.32 188.32 0 0 1 136.16 47.04c58.08 55.04 39.84 146.4 39.84 146.4z" fill="#F56467"></path>
+              <path d="M459.36 547.04a17.6 17.6 0 1 0 17.6 17.6 17.6 17.6 0 0 0-17.6-17.6zm-44.32 23.2a43.52 43.52 0 0 0-18.4 4.32A32 32 0 0 0 376 613.12a32 32 0 0 0 42.88 9.12 32 32 0 0 0 20.64-38.72 25.76 25.76 0 0 0-24.48-13.28z" fill="#F56467"></path>
+            </svg>
+          </a>
+          <a href="https://sns.qzone.qq.com/cgi-bin/qzshare/cgi_qzshare_onekey?url=http://blog.shangsw.com/archives/reentrantlockhtml&amp;sharesource=qzone&amp;title=2%E3%80%81ReentrantLock%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90&amp;pics=http://gateway.shangsw.com/open-api/static/images/01/20190417.jpg" target="_blank" rel="noopener noreferrer" title="分享到QQ空间">
+            <svg class="icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
+              <path d="M512 73.28A438.72 438.72 0 1 0 950.72 512 438.72 438.72 0 0 0 512 73.28zM829.92 432c5.6 16-150.24 146.4-150.24 146.4s2.08 12.64 4.16 22.08c0 0-72.64 2.24-132.32 0-32-1.28-69.12-7.04-69.12-7.04L656 470.24a1005.44 1005.44 0 0 0-125.76-13.6A908 908 0 0 0 380 463.36c-6.4 1.76 44.8 1.6 103.04 6.88 40.8 3.68 94.56 13.44 94.56 13.44l-172.8 128s73.92 4.48 140.32 4.16c74.72 0 142.24-9.92 142.72-8 12.96 56.16 36.96 167.52 28 176-12.16 12.32-185.6-97.6-185.6-97.6S368 785.6 345.92 785.6a3.68 3.68 0 0 1-2.08 0c-10.72-8.8 35.52-206.72 35.52-206.72S222.72 448 229.12 432s208-30.24 208-30.24 74.88-188 92.48-188 92.8 188 92.8 188S824.32 416 829.92 432z" fill="#F5BE3F"></path>
+            </svg>
+          </a>
+          <a href="https://connect.qq.com/widget/shareqq/index.html?url=http://blog.shangsw.com/archives/reentrantlockhtml&amp;title=2%E3%80%81ReentrantLock%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90&amp;pics=http://gateway.shangsw.com/open-api/static/images/01/20190417.jpg" target="_blank" rel="noopener noreferrer" title="分享到QQ">
+            <svg class="icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
+              <path d="M512 73.28A438.72 438.72 0 1 0 950.72 512 438.72 438.72 0 0 0 512 73.28zM759.84 646.4c-9.6 8.16-20.8-6.08-29.76-20.32s-14.88-26.72-16-21.76a158.4 158.4 0 0 1-37.44 70.72c-1.28 1.6 28.8 12.48 37.44 35.68s24 57.6-80 68.8a145.76 145.76 0 0 1-80-16c-16.96-8.32-27.52-16-29.6-16a73.6 73.6 0 0 1-13.28 0 108 108 0 0 1-14.4 0c-1.76 0-22.24 32-113.12 32-70.4 0-88.64-44.32-74.4-68.8s37.76-32 34.4-35.36a192 192 0 0 1-34.4-57.6 98.56 98.56 0 0 1-4.16-13.44c-1.28-4.64-6.56 8.64-13.92 21.76s-14.4 22.72-22.88 22.72a11.52 11.52 0 0 1-6.56-2.4c-20.96-16-19.2-55.2-5.44-93.12s48-75.04 48-83.2c1.28-30.24-3.04-35.2 0-43.2 6.56-17.76 14.72-10.88 14.72-20.16 0-116.32 86.4-210.56 192.96-210.56s192.96 94.24 192.96 210.56c0 4.48 11.68 0 17.12 20.16a196.96 196.96 0 0 1 0 43.2c0 11.04 29.44 24.48 44.8 83.2S768 640 759.84 646.4z" fill="#68A5E1"></path>
+            </svg>
+          </a>
+          <a id="share_to_weixin" href="javascript:;" title="分享到微信">
+            <svg class="icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="26" height="26">
+              <path d="M334.848 334.336a33.792 33.792 0 0 0-36.352 30.72 33.792 33.792 0 0 0 36.352 30.72 28.672 28.672 0 0 0 30.208-30.72 28.672 28.672 0 0 0-30.208-30.72zM581.12 512a24.576 24.576 0 0 0 0 51.2 27.648 27.648 0 0 0 30.208-24.576 27.648 27.648 0 0 0-30.208-26.624zM502.784 395.776a28.672 28.672 0 0 0 30.208-30.72 28.672 28.672 0 0 0-30.208-30.72 33.792 33.792 0 0 0-35.84 30.72 33.792 33.792 0 0 0 35.84 30.72zM713.216 512a24.576 24.576 0 0 0 0 51.2 27.648 27.648 0 0 0 30.208-24.576 27.648 27.648 0 0 0-30.208-26.624z" fill="#3db214"></path>
+              <path d="M512 0a512 512 0 1 0 512 512A512 512 0 0 0 512 0zM412.672 646.656a403.456 403.456 0 0 1-83.968-12.288l-83.968 43.008 24.064-73.728a201.216 201.216 0 0 1-96.256-165.376c0-116.224 108.032-207.872 240.128-207.872a240.128 240.128 0 0 1 242.688 172.032h-23.04a198.144 198.144 0 0 0-204.8 193.536 185.344 185.344 0 0 0 7.168 51.2zM768 732.672l17.92 60.928-66.048-36.864a296.96 296.96 0 0 1-72.192 12.288 191.488 191.488 0 0 1-204.8-177.664 191.488 191.488 0 0 1 204.8-177.664c108.032 0 204.8 79.872 204.8 177.664A185.856 185.856 0 0 1 768 732.672z" fill="#3db214"></path>
+            </svg>
+            <div class="qrcode_wrapper animated bounceIn">
+              <div class="qrcode_wx"><canvas width="140" height="140"></canvas></div>
+              <p>微信扫一扫</p>
+            </div>
+          </a>
+      </div>
+    </div>
+  <div class="joe_donate" style="display: none;">
+    <i class="joe-font joe-icon-shang"></i>
+      <ol class="joe_donate_list two">
+        <li><img src="./2、ReentrantLock源码解析_files/支付宝收款.jpg" onerror="Joe.errorImg(this)" alt="qrcode alipay"></li>
+        <li><img src="./2、ReentrantLock源码解析_files/微信收款.jpg" onerror="Joe.errorImg(this)" alt="qrcode weixin"></li>
+      </ol>
+  </div>
+</div>  <div class="joe_detail__copyright">
+    <div class="content">
+      <div class="item">
+        <svg class="icon" width="20" height="20" viewBox="0 0 1024 1024">
+          <path d="M614.72 554.538c-49.086-6.399-100.27-2.1-149.256-2.1-119.465 0-209.04 95.972-206.84 215.437 0 17.095 8.498 31.99 23.493 40.488 14.896 10.697 34.09 14.896 53.285 17.095 61.882 6.398 123.664 6.398 198.342 6.398 40.488 0 93.872-2.1 142.858-4.298 27.692 0 53.284-4.3 78.877-14.896 19.194-8.498 29.89-19.194 31.99-40.488 8.498-104.57-72.478-204.84-172.75-217.636zM680.8 375.39c0-87.474-74.678-162.053-164.251-162.053-89.574 0-162.053 74.679-162.053 162.053-2.1 87.474 74.678 164.252 162.053 164.252 89.673 0 164.252-74.678 164.252-164.252z" fill="#FFF"></path>
+          <path d="M512.35 0C228.733 0 .5 228.233.5 511.85s228.233 511.85 511.85 511.85 511.85-228.233 511.85-511.85S795.967 0 512.35 0zm275.12 772.074c-2.1 21.294-12.797 31.99-31.991 40.488-25.593 10.697-51.185 14.896-78.877 14.896-49.086 2.099-102.37 4.298-142.858 4.298-74.678 0-136.46 0-198.342-6.398-19.195-2.1-38.389-6.398-53.285-17.095-14.895-8.497-23.493-23.493-23.493-40.488-2.1-119.465 87.475-215.437 206.84-215.437 49.085 0 100.27-4.299 149.256 2.1 100.27 12.896 181.247 113.166 172.75 217.636zM354.495 375.39c0-87.474 72.479-162.053 162.053-162.053S680.8 288.016 680.8 375.39c0 89.574-74.679 164.252-164.252 164.252-87.375 0-164.152-76.778-162.053-164.252z" fill="#249FF8"></path>
+        </svg>
+        <span>版权归属：</span>
+        <span class="text">林雷</span>
+      </div>
+      <div class="item">
+        <svg class="icon" width="20" height="20" viewBox="0 0 1024 1024">
+          <path d="M511.854 0A511.854 511.854 0 1 0 1024 511.854 511.854 511.854 0 0 0 511.854 0z" fill="#39B54A"></path>
+          <path d="M576.491 630.355L460.028 746.818a129.565 129.565 0 0 1-182.555 0l-2.038-2.038a128.983 128.983 0 0 1 0-182.264l81.233-81.233a179.644 179.644 0 0 0 13.102 70.46l-52.7 52.408a69.878 69.878 0 0 0 0 98.703l2.038 2.038a70.169 70.169 0 0 0 98.703 0l116.463-116.463a69.878 69.878 0 0 0 0-98.703l-2.039-2.038a69.587 69.587 0 0 0-13.975-10.772l42.509-42.51a128.11 128.11 0 0 1 13.102 11.356l2.038 2.038a129.274 129.274 0 0 1 0 182.264z" fill="#FFF"></path>
+          <path d="M746.236 460.902l-81.233 81.233a179.353 179.353 0 0 0-13.102-70.46l52.7-52.409a69.878 69.878 0 0 0 0-98.702l-2.039-2.038a69.878 69.878 0 0 0-98.702 0L487.397 434.989a69.878 69.878 0 0 0 0 98.702l2.038 2.038a68.422 68.422 0 0 0 13.976 10.773l-42.51 42.51a136.553 136.553 0 0 1-13.101-11.356l-2.038-2.038a128.983 128.983 0 0 1 0-182.265l116.463-116.462a129.565 129.565 0 0 1 182.555 0l2.038 2.038a128.983 128.983 0 0 1 0 182.264z" fill="#FFF"></path>
+        </svg>
+        <span>本文链接：</span>
+        <span class="text">
+          <a class="link" href="http://blog.shangsw.com/archives/reentrantlockhtml" target="_blank" rel="noopener noreferrer nofollow">http://blog.shangsw.com/archives/reentrantlockhtml</a>
+        </span>
+      </div>
+      <div class="item">
+        <svg class="icon" width="20" height="20" viewBox="0 0 1024 1024">
+          <path d="M0 512a512 512 0 1 0 1024 0A512 512 0 1 0 0 512z" fill="#F3B243"></path>
+          <path d="M540.672 323.584a90.112 90.112 0 1 0 180.224 0 90.112 90.112 0 1 0-180.224 0zM540.672 688.128a90.112 90.112 0 1 0 180.224 0 90.112 90.112 0 1 0-180.224 0zM229.376 512a90.112 90.112 0 1 0 180.224 0 90.112 90.112 0 1 0-180.224 0z" fill="#FFF"></path>
+          <path d="M341.037 480.37l257.344-175.718 27.713 40.592-257.34 175.718z" fill="#FFF"></path>
+          <path d="M349.053 488.452L601.907 670.56l-28.725 39.887L320.307 528.34z" fill="#FFF"></path>
+        </svg>
+        <span>许可协议：</span>
+        <span class="text">
+        本文使用《<a class="link" href="http://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh" target="_blank" rel="noopener noreferrer nofollow">署名-非商业性使用-相同方式共享 4.0 国际 (CC BY-NC-SA 4.0)</a>》协议授权
+        </span>
+      </div>
+    </div>
+  </div>
+          </div>
+<ul class="aside_operations" style="display: block;">
+      <li class="post-operate-like">
+      <i class="joe-font joe-icon-dianzan icon-like active"></i>
+      <i class="joe-font joe-icon-dianzan-fill icon-unlike"></i>
+      <span class="nums visible" df="">7</span>
+    </li>
+    <li class="post-operate-comment"><i class="joe-font joe-icon-message"></i></li>
+    <li class="post-operate-share">
+      <i class="joe-font joe-icon-huifu"></i>
+      <div class="share-icon-list">
+          <a id="share_to_weixin" href="javascript:;" title="分享到微信">
+            <svg class="icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="26" height="26">
+              <path d="M334.848 334.336a33.792 33.792 0 0 0-36.352 30.72 33.792 33.792 0 0 0 36.352 30.72 28.672 28.672 0 0 0 30.208-30.72 28.672 28.672 0 0 0-30.208-30.72zM581.12 512a24.576 24.576 0 0 0 0 51.2 27.648 27.648 0 0 0 30.208-24.576 27.648 27.648 0 0 0-30.208-26.624zM502.784 395.776a28.672 28.672 0 0 0 30.208-30.72 28.672 28.672 0 0 0-30.208-30.72 33.792 33.792 0 0 0-35.84 30.72 33.792 33.792 0 0 0 35.84 30.72zM713.216 512a24.576 24.576 0 0 0 0 51.2 27.648 27.648 0 0 0 30.208-24.576 27.648 27.648 0 0 0-30.208-26.624z" fill="#3db214"></path>
+              <path d="M512 0a512 512 0 1 0 512 512A512 512 0 0 0 512 0zM412.672 646.656a403.456 403.456 0 0 1-83.968-12.288l-83.968 43.008 24.064-73.728a201.216 201.216 0 0 1-96.256-165.376c0-116.224 108.032-207.872 240.128-207.872a240.128 240.128 0 0 1 242.688 172.032h-23.04a198.144 198.144 0 0 0-204.8 193.536 185.344 185.344 0 0 0 7.168 51.2zM768 732.672l17.92 60.928-66.048-36.864a296.96 296.96 0 0 1-72.192 12.288 191.488 191.488 0 0 1-204.8-177.664 191.488 191.488 0 0 1 204.8-177.664c108.032 0 204.8 79.872 204.8 177.664A185.856 185.856 0 0 1 768 732.672z" fill="#3db214"></path>
+            </svg>
+            <div class="qrcode_wrapper animated bounceIn">
+              <div class="qrcode_wx"><canvas width="140" height="140"></canvas></div>
+              <p>微信扫一扫</p>
+            </div>
+          </a>
+          <a href="http://service.weibo.com/share/share.php?sharesource=weibo&amp;title=%E5%88%86%E4%BA%AB%EF%BC%9A2%E3%80%81ReentrantLock%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90%EF%BC%8C%E5%8E%9F%E6%96%87%E9%93%BE%E6%8E%A5%EF%BC%9Ahttp://blog.shangsw.com/archives/reentrantlockhtml&amp;pic=http://gateway.shangsw.com/open-api/static/images/01/20190417.jpg" target="_blank" rel="noopener noreferrer" title="分享到新浪微博">
+            <svg class="icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
+              <path d="M480.8 457.76a271.04 271.04 0 0 0-37.28 2.72c-96 13.44-166.72 75.04-157.92 137.44s93.6 101.92 189.6 88.48 166.72-75.04 157.92-137.44c-7.68-54.08-73.12-91.04-152.32-91.2zm-23.36 211.52a122.08 122.08 0 0 1-24 2.4c-48 0-88-27.52-96-68.32-9.28-48 29.44-95.2 86.56-106.24s110.88 18.4 120 66.08-29.44 95.04-86.56 106.08z" fill="#F56467"></path>
+              <path d="M512 73.28A438.72 438.72 0 1 0 950.72 512 438.72 438.72 0 0 0 512 73.28zm-43.84 666.88c-150.24 0-272-78.56-272-176S378.56 314.72 448 314.72c29.28 0 86.56 21.76 46.4 90.88a246.24 246.24 0 0 0 34.08-10.08c32-9.12 76.96-18.24 107.68 0 51.04 29.6 0 77.12 0 82.4s102.4 5.28 102.4 87.2c.32 96.48-120.16 175.04-270.4 175.04zm213.76-358.88a56 56 0 0 0-47.2-16 16.96 16.96 0 0 1-17.28-14.4 12.16 12.16 0 0 0 0 2.4v-4.8a12.16 12.16 0 0 0 0 2.4 20.48 20.48 0 0 1 17.28-17.28 77.28 77.28 0 0 1 68.32 18.56c32 28.48 18.72 75.68 18.72 75.68a21.28 21.28 0 0 1-20.48 17.28h-1.76a12.48 12.48 0 0 1-12.8-16.8 49.44 49.44 0 0 0-4.8-47.04zm120.16 60.64A29.6 29.6 0 0 1 776 467.84a22.08 22.08 0 0 1-19.68-25.92A139.2 139.2 0 0 0 736 336c-34.88-50.08-109.92-41.28-109.92-41.28A26.24 26.24 0 0 1 599.84 272v2.88-5.6V272a26.56 26.56 0 0 1 26.24-23.52 188.32 188.32 0 0 1 136.16 47.04c58.08 55.04 39.84 146.4 39.84 146.4z" fill="#F56467"></path>
+              <path d="M459.36 547.04a17.6 17.6 0 1 0 17.6 17.6 17.6 17.6 0 0 0-17.6-17.6zm-44.32 23.2a43.52 43.52 0 0 0-18.4 4.32A32 32 0 0 0 376 613.12a32 32 0 0 0 42.88 9.12 32 32 0 0 0 20.64-38.72 25.76 25.76 0 0 0-24.48-13.28z" fill="#F56467"></path>
+            </svg>
+          </a>
+          <a href="https://connect.qq.com/widget/shareqq/index.html?url=http://blog.shangsw.com/archives/reentrantlockhtml&amp;title=2%E3%80%81ReentrantLock%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90&amp;pics=http://gateway.shangsw.com/open-api/static/images/01/20190417.jpg" target="_blank" rel="noopener noreferrer" title="分享到QQ">
+            <svg class="icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
+              <path d="M512 73.28A438.72 438.72 0 1 0 950.72 512 438.72 438.72 0 0 0 512 73.28zM759.84 646.4c-9.6 8.16-20.8-6.08-29.76-20.32s-14.88-26.72-16-21.76a158.4 158.4 0 0 1-37.44 70.72c-1.28 1.6 28.8 12.48 37.44 35.68s24 57.6-80 68.8a145.76 145.76 0 0 1-80-16c-16.96-8.32-27.52-16-29.6-16a73.6 73.6 0 0 1-13.28 0 108 108 0 0 1-14.4 0c-1.76 0-22.24 32-113.12 32-70.4 0-88.64-44.32-74.4-68.8s37.76-32 34.4-35.36a192 192 0 0 1-34.4-57.6 98.56 98.56 0 0 1-4.16-13.44c-1.28-4.64-6.56 8.64-13.92 21.76s-14.4 22.72-22.88 22.72a11.52 11.52 0 0 1-6.56-2.4c-20.96-16-19.2-55.2-5.44-93.12s48-75.04 48-83.2c1.28-30.24-3.04-35.2 0-43.2 6.56-17.76 14.72-10.88 14.72-20.16 0-116.32 86.4-210.56 192.96-210.56s192.96 94.24 192.96 210.56c0 4.48 11.68 0 17.12 20.16a196.96 196.96 0 0 1 0 43.2c0 11.04 29.44 24.48 44.8 83.2S768 640 759.84 646.4z" fill="#68A5E1"></path>
+            </svg>
+          </a>
+          <a href="https://sns.qzone.qq.com/cgi-bin/qzshare/cgi_qzshare_onekey?url=http://blog.shangsw.com/archives/reentrantlockhtml&amp;sharesource=qzone&amp;title=2%E3%80%81ReentrantLock%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90&amp;pics=http://gateway.shangsw.com/open-api/static/images/01/20190417.jpg" target="_blank" rel="noopener noreferrer" title="分享到QQ空间">
+            <svg class="icon" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
+              <path d="M512 73.28A438.72 438.72 0 1 0 950.72 512 438.72 438.72 0 0 0 512 73.28zM829.92 432c5.6 16-150.24 146.4-150.24 146.4s2.08 12.64 4.16 22.08c0 0-72.64 2.24-132.32 0-32-1.28-69.12-7.04-69.12-7.04L656 470.24a1005.44 1005.44 0 0 0-125.76-13.6A908 908 0 0 0 380 463.36c-6.4 1.76 44.8 1.6 103.04 6.88 40.8 3.68 94.56 13.44 94.56 13.44l-172.8 128s73.92 4.48 140.32 4.16c74.72 0 142.24-9.92 142.72-8 12.96 56.16 36.96 167.52 28 176-12.16 12.32-185.6-97.6-185.6-97.6S368 785.6 345.92 785.6a3.68 3.68 0 0 1-2.08 0c-10.72-8.8 35.52-206.72 35.52-206.72S222.72 448 229.12 432s208-30.24 208-30.24 74.88-188 92.48-188 92.8 188 92.8 188S824.32 416 829.92 432z" fill="#F5BE3F"></path>
+            </svg>
+          </a>
+          <a class="icon-share-link" href="javascript:;" rel="noopener noreferrer" title="复制文章链接">
+            <svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="3509" width="30" height="30"><path d="M515.2 64c-246.4 0-448 198.4-448 444.8S268.8 953.6 512 953.6c246.4 0 444.8-201.6 444.8-444.8S758.4 64 515.2 64z m-118.4 441.6c-9.6 9.6-28.8 9.6-41.6 0l-22.4-25.6-12.8-9.6c-19.2-22.4-32-48-35.2-76.8 0-28.8 9.6-57.6 28.8-76.8 22.4-19.2 48-28.8 76.8-28.8 28.8 0 60.8 12.8 83.2 35.2l86.4 86.4c22.4 22.4 35.2 51.2 35.2 80 0 25.6-9.6 51.2-28.8 70.4-9.6 9.6-28.8 9.6-41.6 0-9.6-9.6-9.6-28.8 0-38.4 19.2-19.2 16-51.2-3.2-73.6l-86.4-86.4c-12.8-12.8-25.6-19.2-41.6-19.2-9.6 0-22.4 3.2-32 12.8-12.8 12.8-12.8 25.6-12.8 35.2 0 12.8 6.4 28.8 19.2 38.4l12.8 12.8 22.4 22.4c3.2 12.8 3.2 28.8-6.4 41.6z m307.2 201.6c-19.2 19.2-44.8 28.8-73.6 28.8-28.8 0-60.8-12.8-83.2-35.2l-86.4-86.4c-22.4-22.4-35.2-51.2-35.2-80 0-25.6 9.6-51.2 28.8-70.4 9.6-9.6 28.8-9.6 41.6 0 9.6 9.6 9.6 28.8 0 38.4-19.2 19.2-16 51.2 3.2 73.6l86.4 86.4c12.8 12.8 25.6 19.2 41.6 19.2 9.6 0 22.4-3.2 32-12.8 12.8-12.8 12.8-25.6 12.8-35.2 0-12.8-6.4-28.8-19.2-38.4l-25.6-25.6-9.6-9.6c-9.6-9.6-9.6-28.8 0-38.4 9.6-9.6 28.8-9.6 41.6 0l12.8 12.8 19.2 19.2c22.4 19.2 35.2 48 35.2 73.6 9.6 32-3.2 57.6-22.4 80z" fill="#989b9e"></path></svg>
+          </a>
+      </div>
+    </li>
+    <li class="post-operate-donate">
+      <i class="joe-font joe-icon-shang"></i>
+  <div class="joe_donate">
+    
+      <ol class="joe_donate_list two">
+        <li><img src="./2、ReentrantLock源码解析_files/支付宝收款.jpg" onerror="Joe.errorImg(this)" alt="qrcode alipay"></li>
+        <li><img src="./2、ReentrantLock源码解析_files/微信收款.jpg" onerror="Joe.errorImg(this)" alt="qrcode weixin"></li>
+      </ol>
+  </div>
+    </li>
+</ul>          <ul class="joe_post__pagination">
+              <li class="joe_post__pagination-item prev"><a href="http://blog.shangsw.com/archives/countdownlatchhtml" title="3、CountDownLatch源码解析">上一篇</a></li>
+              <li class="joe_post__pagination-item next"><a href="http://blog.shangsw.com/archives/aqshtml" title="1、AbstractQueuedSynchronizer原理分析">下一篇</a></li>
+          </ul>
+            <div class="joe_comment">
+  <div class="joe_comment_box">
+    <h2>评论区</h2>
+    <halo-comment id="120" type="post" configs="{&quot;autoLoad&quot;: &quot;true&quot;, &quot;showUserAgent&quot;: &quot;false&quot;, &quot;gravatarSource&quot;: &quot;https://sdn.geekzu.org/avatar&quot;, &quot;loadingStyle&quot;: &quot;default&quot;, &quot;authorPopup&quot;: &quot;你的昵称是啥呢？&quot;, &quot;emailPopup&quot;: &quot;你将收到回复通知&quot;, &quot;aWord&quot;: &quot;你是我一生只会遇见一次的惊喜 ...&quot;, &quot;avatarLoading&quot;: &quot;/themes/joe2.0/source/svg/spinner-preloader.svg&quot;, &quot;avatarError&quot;: &quot;/themes/joe2.0/source/img/error_avatar.jpg&quot;, &quot;notComment&quot;: &quot;暂无评论&quot;}" options="{&quot;blog_logo&quot;: &quot;/upload/2022/05/7.jpg&quot;, &quot;gravatar_source&quot;: &quot;//gravatar.com/avatar/&quot;, &quot;comment_gravatar_default&quot;: &quot;&quot;}"><template shadowrootmode="open"><style type="text/css">@charset "UTF-8";
+.markdown-body {
+  -ms-text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+  color: #24292e;
+  line-height: 1.5;
+  font-size: 14px;
+  word-wrap: break-word;
+}
+.markdown-body * {
+    -webkit-box-sizing: border-box;
+            box-sizing: border-box;
+}
+.markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3,
+  .markdown-body h4,
+  .markdown-body h5,
+  .markdown-body h6 {
+    margin-bottom: 10px;
+    margin-top: 10px;
+    font-weight: 600;
+    color: var(--classF);
+}
+.markdown-body h1 {
+    font-size: 2em;
+    margin: .67em 0;
+    font-size: 32px;
+    font-size: 2em;
+}
+.markdown-body h2 {
+    font-size: 24px;
+    font-size: 1.5em;
+}
+.markdown-body h3 {
+    font-size: 20px;
+    font-size: 1.25em;
+}
+.markdown-body h4 {
+    font-size: 16px;
+    font-size: 1em;
+}
+.markdown-body h5 {
+    font-size: 14px;
+}
+.markdown-body h6 {
+    font-size: 14px;
+    color: #6a737d;
+    font-size: .85em;
+}
+.markdown-body h1,
+  .markdown-body h2 {
+    font-weight: 600;
+    padding-bottom: .3em;
+    line-height: 1.25;
+    border-bottom: 1px solid var(--classE);
+}
+.markdown-body h4,
+  .markdown-body h5,
+  .markdown-body h6 {
+    line-height: 1.2;
+}
+.markdown-body p {
+    margin-bottom: 10px;
+    margin-top: 0;
+    line-height: 1.5;
+    font-size: 14px;
+}
+.markdown-body p:last-child {
+      margin-bottom: 0;
+}
+.markdown-body .octicon {
+    display: inline-block;
+    fill: currentColor;
+    vertical-align: text-bottom;
+}
+.markdown-body .anchor {
+    float: left;
+    line-height: 1;
+    margin-left: -20px;
+    padding-right: 4px;
+}
+.markdown-body .anchor:focus {
+      outline: none;
+}
+.markdown-body details {
+    display: block;
+}
+.markdown-body details summary {
+      cursor: pointer;
+}
+.markdown-body summary {
+    display: list-item;
+}
+.markdown-body a {
+    background-color: transparent;
+    text-decoration: none;
+}
+.markdown-body a:hover {
+      text-decoration: underline;
+}
+.markdown-body a:not([href]) {
+      color: inherit;
+      text-decoration: none;
+}
+.markdown-body strong {
+    font-weight: inherit;
+    font-weight: bolder;
+    font-weight: 600;
+}
+.markdown-body img {
+    border-style: none;
+    -webkit-box-sizing: content-box;
+            box-sizing: content-box;
+    max-width: 100%;
+}
+.markdown-body hr {
+    -webkit-box-sizing: content-box;
+            box-sizing: content-box;
+    height: 0;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid #dfe2e5;
+    height: 0;
+    margin: 15px 0;
+    overflow: hidden;
+    background-color: #e1e4e8;
+    border: 0;
+    height: .25em;
+    margin: 24px 0;
+    padding: 0;
+    border-bottom-color: #eee;
+}
+.markdown-body hr:before {
+      content: "";
+      display: table;
+}
+.markdown-body hr:after {
+      clear: both;
+      content: "";
+      display: table;
+}
+.markdown-body input {
+    font: inherit;
+    margin: 0;
+    overflow: visible;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+}
+.markdown-body [type=checkbox] {
+    -webkit-box-sizing: border-box;
+            box-sizing: border-box;
+    padding: 0;
+}
+.markdown-body table {
+    border-collapse: collapse;
+    border-spacing: 0;
+    display: table;
+    overflow: auto;
+}
+.markdown-body table th {
+      font-weight: 600;
+}
+.markdown-body table tr {
+      background-color: #fff;
+      border-top: 1px solid #c6cbd1;
+}
+.markdown-body table tr:nth-child(2n) {
+        background-color: #f6f8fa;
+}
+.markdown-body blockquote {
+    margin: 0;
+    color: #6a737d;
+    padding: 0 1em;
+    border-left: .25em solid #dfe2e5;
+}
+.markdown-body blockquote > :first-child {
+      margin-top: 0;
+}
+.markdown-body blockquote > :last-child {
+      margin-bottom: 0;
+}
+.markdown-body dd {
+    margin-left: 0;
+}
+.markdown-body .markdown-content pre {
+    margin-top: 0;
+    word-wrap: normal;
+    white-space: pre;
+    word-break: break-word;
+}
+.markdown-body .markdown-content pre > code {
+      border: 0;
+      font-size: 100%;
+      margin: 0;
+      padding: 0;
+      white-space: inherit;
+      word-break: break-word;
+}
+.markdown-body .markdown-content pre code {
+      display: inline;
+      line-height: inherit;
+      margin: 0;
+      overflow: visible;
+      padding: 0;
+      border: 0;
+      color: var(--classF);
+      word-wrap: normal;
+      white-space: inherit;
+      word-break: break-word;
+      background-color: transparent;
+}
+.markdown-body li {
+    word-wrap: break-all;
+}
+.markdown-body li > p {
+      margin-top: 12px;
+}
+.markdown-body li + li {
+      margin-top: .25em;
+}
+.markdown-body dl {
+    padding: 0;
+}
+.markdown-body dl dt {
+      font-size: 1em;
+      font-style: italic;
+      font-weight: 600;
+      margin-top: 16px;
+      padding: 0;
+}
+.markdown-body dl dd {
+      margin-bottom: 16px;
+      padding: 0 16px;
+}
+.markdown-body img[align=right] {
+    padding-left: 20px;
+}
+.markdown-body img[align=left] {
+    padding-right: 20px;
+}
+.markdown-body code {
+    margin: 0;
+    padding: .2em .4em;
+    font-size: 85%;
+    color: #666;
+    color: var(--routine);
+    background-color: #ebebeb;
+    background-color: var(--classA);
+    border-radius: 3px;
+}
+.markdown-body .highlight {
+    margin-bottom: 16px;
+}
+.markdown-body .highlight pre {
+      margin-bottom: 0;
+      word-break: normal;
+}
+.markdown-body ol,
+  .markdown-body ul {
+    margin-bottom: 0;
+    margin-top: 0;
+    padding-left: 0;
+    padding-left: 2em;
+    list-style: auto;
+    color: var(--routine);
+}
+.markdown-body .markdown-body td,
+  .markdown-body .markdown-body th {
+    padding: 0;
+}
+.markdown-body ol ol,
+  .markdown-body ul ol {
+    list-style-type: lower-roman;
+}
+.markdown-body ol ol ol,
+  .markdown-body ol ul ol,
+  .markdown-body ul ol ol,
+  .markdown-body ul ul ol {
+    list-style-type: lower-alpha;
+}
+.markdown-body input::-webkit-inner-spin-button,
+  .markdown-body input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+}
+.markdown-body blockquote,
+  .markdown-body dl,
+  .markdown-body ol,
+  .markdown-body p,
+  .markdown-body pre,
+  .markdown-body table,
+  .markdown-body ul {
+    margin-bottom: 10px;
+    margin-top: 0;
+}
+.markdown-body ul {
+    list-style: disc;
+}
+.markdown-body ol ol,
+  .markdown-body ol ul,
+  .markdown-body ul ol,
+  .markdown-body ul ul {
+    margin-bottom: 0;
+    margin-top: 0;
+}
+.markdown-body table td,
+  .markdown-body table th {
+    border: 1px solid #dfe2e5;
+    padding: 6px 12px;
+}
+.markdown-body pre,
+.markdown-body code,
+.markdown-content pre,
+.markdown-content code {
+  font-size: 12px;
+}
+.markdown-body .highlight pre,
+.markdown-body pre,
+.markdown-content .highlight pre,
+.markdown-content pre {
+  font-size: 85%;
+  line-height: 1.45;
+  overflow: auto;
+  padding: 12px;
+  background-color: #ebebeb;
+  background-color: var(--classA);
+  border-radius: 3px;
+}
+
+/*--------------------------------------------------------------
+  # Normalize
+--------------------------------------------------------------*/
+html.disable-scroll {
+  height: 100vh;
+  overflow: hidden;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background-color: #eee;
+}
+::-webkit-scrollbar-track {
+  background-color: #eee;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--theme);
+}
+div {
+  -webkit-transition: top 0.8s ease;
+  transition: top 0.8s ease;
+}
+.no-select {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+.halo-comment {
+  font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+}
+.halo-comment a {
+    text-decoration: none;
+    color: var(--theme);
+}
+.halo-comment input::-webkit-input-placeholder,
+  .halo-comment textarea::-webkit-input-placeholder {
+    color: #cccccc;
+}
+.halo-comment button,
+  .halo-comment input,
+  .halo-comment textarea {
+    box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    -webkit-appearance: none;
+    outline: none;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+.halo-comment button:focus,
+  .halo-comment input:focus,
+  .halo-comment textarea:focus {
+    outline: none;
+}
+.halo-comment ol,
+  .halo-comment ul {
+    list-style: none;
+}
+
+/*--------------------------------------------------------------
+  # Comment
+--------------------------------------------------------------*/
+.halo-comment {
+  position: relative;
+  -webkit-box-sizing: border-box;
+          box-sizing: border-box;
+  text-align: left;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 1.5;
+  color: #313131;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-animation: main 0.6s;
+          animation: main 0.6s;
+  /*--------------------------------------------------------------
+    # Loading
+  --------------------------------------------------------------*/
+  /*--------------------------------------------------------------
+    # CommmentLoader
+  --------------------------------------------------------------*/
+  /*--------------------------------------------------------------
+    # CommmentNode
+  --------------------------------------------------------------*/
+  /*--------------------------------------------------------------
+    # Commment Editor
+  --------------------------------------------------------------*/
+  /*--------------------------------------------------------------
+    # Commment Empty
+    --------------------------------------------------------------*/
+  /*--------------------------------------------------------------
+    # Commment Pagination
+    --------------------------------------------------------------*/
+}
+.halo-comment input[type="text"],
+  .halo-comment input[type="email"],
+  .halo-comment input[type="url"],
+  .halo-comment input[type="password"],
+  .halo-comment input[type="search"],
+  .halo-comment input[type="number"],
+  .halo-comment input[type="tel"],
+  .halo-comment input[type="range"],
+  .halo-comment input[type="date"],
+  .halo-comment input[type="month"],
+  .halo-comment input[type="week"],
+  .halo-comment input[type="time"],
+  .halo-comment input[type="datetime"],
+  .halo-comment input[type="datetime-local"],
+  .halo-comment input[type="color"],
+  .halo-comment textarea {
+    color: #666;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+.halo-comment .avatar {
+    background-color: #f5f5f5;
+}
+.halo-comment .comment-load-button {
+    margin: 30px 0;
+    text-align: center;
+}
+.halo-comment .comment-loader-container {
+    -webkit-animation: top20 500ms;
+            animation: top20 500ms;
+    position: relative;
+    text-align: center;
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-pack: center;
+        -ms-flex-pack: center;
+            justify-content: center;
+    margin: 30px 0;
+}
+.halo-comment .comment-loader-container .comment-loader-default {
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+          -ms-flex-flow: row nowrap;
+              flex-flow: row nowrap;
+      -webkit-box-align: center;
+          -ms-flex-align: center;
+              align-items: center;
+      -webkit-box-pack: justify;
+          -ms-flex-pack: justify;
+              justify-content: space-between;
+      width: 30px;
+}
+.halo-comment .comment-loader-container .comment-loader-default span {
+        width: 4px;
+        height: 15px;
+        background-color: #898c7b;
+}
+.halo-comment .comment-loader-container .comment-loader-default span:nth-of-type(1) {
+          -webkit-animation: grow 1s -0.45s ease-in-out infinite;
+                  animation: grow 1s -0.45s ease-in-out infinite;
+}
+.halo-comment .comment-loader-container .comment-loader-default span:nth-of-type(2) {
+          -webkit-animation: grow 1s -0.3s ease-in-out infinite;
+                  animation: grow 1s -0.3s ease-in-out infinite;
+}
+.halo-comment .comment-loader-container .comment-loader-default span:nth-of-type(3) {
+          -webkit-animation: grow 1s -0.15s ease-in-out infinite;
+                  animation: grow 1s -0.15s ease-in-out infinite;
+}
+.halo-comment .comment-loader-container .comment-loader-default span:nth-of-type(4) {
+          -webkit-animation: grow 1s ease-in-out infinite;
+                  animation: grow 1s ease-in-out infinite;
+}
+@-webkit-keyframes grow {
+0%,
+  100% {
+    -webkit-transform: scaleY(1);
+            transform: scaleY(1);
+}
+50% {
+    -webkit-transform: scaleY(2);
+            transform: scaleY(2);
+}
+}
+@keyframes grow {
+0%,
+  100% {
+    -webkit-transform: scaleY(1);
+            transform: scaleY(1);
+}
+50% {
+    -webkit-transform: scaleY(2);
+            transform: scaleY(2);
+}
+}
+.halo-comment .comment-loader-container .comment-loader-circle {
+      border: 3px solid #898c7b;
+      border-top-color: #fff;
+      border-radius: 50%;
+      width: 2.5em;
+      height: 2.5em;
+      -webkit-animation: spin 0.7s linear infinite;
+              animation: spin 0.7s linear infinite;
+}
+@-webkit-keyframes spin {
+to {
+    -webkit-transform: rotate(360deg);
+            transform: rotate(360deg);
+}
+}
+@keyframes spin {
+to {
+    -webkit-transform: rotate(360deg);
+            transform: rotate(360deg);
+}
+}
+.halo-comment .comment-loader-container .comment-loader-balls {
+      width: 3.5em;
+      display: -webkit-box;
+      display: -ms-flexbox;
+      display: flex;
+      -webkit-box-orient: horizontal;
+      -webkit-box-direction: normal;
+          -ms-flex-flow: row nowrap;
+              flex-flow: row nowrap;
+      -webkit-box-align: center;
+          -ms-flex-align: center;
+              align-items: center;
+      -webkit-box-pack: justify;
+          -ms-flex-pack: justify;
+              justify-content: space-between;
+}
+.halo-comment .comment-loader-container .comment-loader-balls div {
+        width: 0.7em;
+        height: 0.7em;
+        border-radius: 50%;
+        background-color: #898c7b;
+        -webkit-transform: translateY(-100%);
+                transform: translateY(-100%);
+        -webkit-animation: wave 0.7s ease-in-out alternate infinite;
+                animation: wave 0.7s ease-in-out alternate infinite;
+}
+.halo-comment .comment-loader-container .comment-loader-balls div:nth-of-type(1) {
+          -webkit-animation-delay: -0.4s;
+                  animation-delay: -0.4s;
+}
+.halo-comment .comment-loader-container .comment-loader-balls div:nth-of-type(2) {
+          -webkit-animation-delay: -0.2s;
+                  animation-delay: -0.2s;
+}
+.halo-comment .commentwrap {
+    width: 100%;
+    margin: 0 auto 10px;
+    padding: 0;
+    /*--------------------------------------------------------------
+        # Commment Children #5 修复层次过多的BUG
+        --------------------------------------------------------------*/
+}
+.halo-comment .commentwrap .comment-wrp {
+      padding: 10px 0 16px 0;
+      border-bottom: 1px solid #ddd;
+}
+.halo-comment .commentwrap .comment-wrp li {
+        clear: both;
+}
+.halo-comment .commentwrap .comment-wrp:first-child {
+        padding-top: 0;
+}
+.halo-comment .commentwrap .comment-wrp:last-child {
+        padding-bottom: 0;
+        border: none;
+}
+.halo-comment .commentwrap .children {
+      padding-left: 40px;
+      margin: 0;
+      clear: both;
+}
+.halo-comment .commentwrap .children .comment-wrp:last-child {
+        border: none;
+}
+.halo-comment .commentwrap .children main {
+        width: 100%;
+}
+.halo-comment .commentwrap .children .profile {
+        float: left;
+        margin-top: 4px;
+}
+.halo-comment .commentwrap .children .profile img {
+          height: 40px;
+          width: 40px;
+}
+.halo-comment .commentwrap .children .children .children .children .children .children {
+        margin: 0;
+        padding: 0;
+}
+@media screen and (max-width: 500px) {
+.halo-comment .commentwrap .children {
+        padding-left: 20px;
+}
+}
+.halo-comment .comment {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    list-style: none;
+    /*--------------------------------------------------------------
+        # CommmentAvatar
+        --------------------------------------------------------------*/
+    /*--------------------------------------------------------------
+        # CommmentUserInfo
+        --------------------------------------------------------------*/
+    /*--------------------------------------------------------------
+        # CommmentReply
+        --------------------------------------------------------------*/
+    /*--------------------------------------------------------------
+        # Commment Body
+        --------------------------------------------------------------*/
+}
+.halo-comment .comment .contents {
+      width: 100%;
+      padding-top: 10px;
+      float: left;
+}
+.halo-comment .comment .contents:hover .comment-reply-link {
+        opacity: 0.9;
+}
+.halo-comment .comment .main {
+      float: right;
+      width: 100%;
+      padding: 0;
+}
+.halo-comment .comment .main.shadow img.avatar {
+        -webkit-transition: all ease 1s;
+        transition: all ease 1s;
+        -webkit-box-shadow: 0 1px 10px -6px rgba(0, 0, 0, 0.5);
+                box-shadow: 0 1px 10px -6px rgba(0, 0, 0, 0.5);
+}
+.halo-comment .comment .main.shadow .profile:hover img.avatar {
+        -webkit-transform: rotate(360deg);
+                transform: rotate(360deg);
+}
+.halo-comment .comment .profile {
+      float: left;
+      margin-right: 10px;
+      margin-top: 6px;
+}
+.halo-comment .comment .profile a.disabled {
+        pointer-events: none;
+}
+.halo-comment .comment .profile img {
+        width: 100%;
+        max-width: 40px;
+        height: 40px;
+        border-radius: 100%;
+        -webkit-transition: opacity 0.15s ease-out;
+        transition: opacity 0.15s ease-out;
+}
+.halo-comment .comment .profile img:hover {
+          opacity: 0.8;
+}
+@media (max-width: 880px) {
+.halo-comment .comment .profile {
+          display: none;
+}
+}
+.halo-comment .comment .commeta {
+      font-size: 16px;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      color: #9499a8;
+      margin-left: 50px;
+}
+.halo-comment .comment .commeta .bb-comment {
+        position: relative;
+        top: -1px;
+        display: inline-block;
+        min-width: 30px;
+        text-align: center;
+        font-size: 12px;
+        color: #fb7299;
+        font-weight: 400;
+        -webkit-transform: scale(0.9);
+                transform: scale(0.9);
+        border: 1px solid #fb7299;
+        border-radius: 4px;
+}
+.halo-comment .comment .commeta .comment-time {
+        display: inline-block;
+        margin-top: 6px;
+        font-size: 12px;
+        color: #657786;
+}
+.halo-comment .comment .commeta .info {
+        margin-top: 2px;
+        font-size: 12px;
+        letter-spacing: 0px;
+        text-transform: none;
+        color: rgba(0, 0, 0, 0.35);
+}
+.halo-comment .comment .commeta .info .useragent-info img {
+          vertical-align: sub;
+          width: 14px;
+          height: 14px;
+          border: 0;
+}
+@media (max-width: 480px) {
+.halo-comment .comment .commeta .info .useragent-info {
+            display: none;
+}
+}
+.halo-comment .comment .commeta .info .useragent-info-m {
+          margin-top: 2px;
+          font-size: 12px;
+          letter-spacing: 0px;
+          text-transform: none;
+          color: rgba(0, 0, 0, 0.35);
+          display: none;
+}
+.halo-comment .comment .commeta .info .useragent-info-m img {
+            vertical-align: sub;
+            width: 14px;
+            height: 14px;
+            border: 0;
+}
+@media (max-width: 480px) {
+.halo-comment .comment .commeta .info .useragent-info-m {
+              display: inline;
+}
+}
+@media (max-width: 880px) {
+.halo-comment .comment .commeta {
+          margin-left: 0;
+}
+}
+.halo-comment .comment .author {
+      font-size: 24px;
+      font-weight: 400;
+      margin: 0;
+      letter-spacing: 0px;
+      text-transform: none;
+      line-height: 20px;
+}
+.halo-comment .comment .author a {
+        color: var(--theme);
+        font-size: 14px;
+        font-weight: 600;
+}
+.halo-comment .comment .author a.disabled {
+          pointer-events: none;
+}
+.halo-comment .comment .author a:hover {
+          color: var(--theme);
+}
+.halo-comment .comment .author img {
+        display: none;
+        border-radius: 3px;
+        margin-right: 5px;
+        vertical-align: -4px;
+}
+@media (max-width: 880px) {
+.halo-comment .comment .author img {
+            display: inline-block;
+}
+}
+.halo-comment .comment .comment-reply-link {
+      font-size: 12px;
+      display: block;
+      margin-left: 10px;
+      float: right;
+      text-transform: uppercase;
+      color: #fff;
+      background-color: var(--theme);
+      line-height: 20px;
+      padding: 0 6px;
+      border-radius: 3px;
+      opacity: 0;
+}
+.halo-comment .comment .comment-reply-link:hover {
+        opacity: 1;
+}
+@media (max-width: 880px) {
+.halo-comment .comment .comment-reply-link {
+        opacity: 1;
+}
+}
+.halo-comment .comment .body {
+      color: #63686d;
+      position: relative;
+}
+.halo-comment .comment .body > *:last-child {
+        margin-bottom: 0;
+}
+.halo-comment .comment .body p {
+        font-size: 14px;
+        line-height: 1.5;
+        color: #63686d;
+}
+.halo-comment .comment .body p a {
+          position: relative;
+          color: var(--theme);
+}
+.halo-comment .comment .body p a:after {
+            content: "";
+            position: absolute;
+            width: 100%;
+            -webkit-transform: scaleX(0);
+                    transform: scaleX(0);
+            height: 2px;
+            bottom: 0;
+            left: 0;
+            background-color: var(--theme);
+            -webkit-transform-origin: bottom right;
+                    transform-origin: bottom right;
+            -webkit-transition: -webkit-transform 0.25s ease-out;
+            transition: -webkit-transform 0.25s ease-out;
+            transition: transform 0.25s ease-out;
+            transition: transform 0.25s ease-out, -webkit-transform 0.25s ease-out;
+}
+.halo-comment .comment .body p a:hover:after {
+            -webkit-transform: scaleX(1);
+                    transform: scaleX(1);
+            -webkit-transform-origin: bottom left;
+                    transform-origin: bottom left;
+}
+.halo-comment .comment .body p p {
+          display: inline;
+}
+@media (max-width: 580px) {
+.halo-comment .comment .body p {
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.7;
+}
+}
+.halo-comment .comment .body .comment-at {
+        color: #99ce00;
+        text-decoration: none;
+}
+.halo-comment .comment .body .comment-at:after {
+          bottom: -2px;
+          background-color: #99ce00;
+}
+.halo-comment .markdown-body {
+    margin-bottom: 15px;
+    line-height: 1;
+    white-space: pre-line;
+    word-break: break-all;
+    font-size: 14px !important;
+}
+.halo-comment .markdown-body .markdown-content {
+      padding: 10px;
+      white-space: pre-line;
+      word-break: break-all;
+      background: var(--sub-background);
+      border-radius: 0 8px 8px;
+}
+.halo-comment .markdown-body .markdown-content.blink {
+        -webkit-animation: blink 0.3s linear infinite alternate;
+                animation: blink 0.3s linear infinite alternate;
+}
+@-webkit-keyframes blink {
+from {
+    -webkit-filter: brightness(1);
+            filter: brightness(1);
+}
+from {
+    -webkit-filter: brightness(0.5);
+            filter: brightness(0.5);
+}
+}
+@keyframes blink {
+from {
+    -webkit-filter: brightness(1);
+            filter: brightness(1);
+}
+from {
+    -webkit-filter: brightness(0.5);
+            filter: brightness(0.5);
+}
+}
+.halo-comment .markdown-body img {
+      max-width: 100%;
+}
+.halo-comment .markdown-body .emoji-item {
+      display: inline-block;
+      padding: 0;
+      overflow: hidden;
+      color: #333;
+      background-color: transparent;
+}
+@media (max-width: 860px) {
+.halo-comment .markdown-body .emoji-item {
+          -webkit-transform: scale(0.8);
+                  transform: scale(0.8);
+}
+}
+.halo-comment .markdown-body .emoji-item img {
+        position: relative;
+        top: -3px;
+        display: block;
+        max-width: 100%;
+        width: auto;
+        height: 26px;
+        margin: 2px auto 0;
+        border: 0;
+}
+.halo-comment .markdown-body .emoji-item.text {
+        width: auto;
+        height: auto;
+        padding: 2px 6px;
+        font-size: 14px;
+}
+.halo-comment .markdown-body .emoji-animate {
+      position: relative;
+      top: 10px;
+      width: 32px;
+      height: 32px;
+}
+.halo-comment .markdown-body .emoji-animate .img {
+        width: 32px;
+        height: 864px;
+        max-width: 32px;
+        background: top/32px no-repeat;
+        background-image: none;
+        -webkit-animation: im-emotion-step 1.08s steps(27) infinite;
+                animation: im-emotion-step 1.08s steps(27) infinite;
+}
+.halo-comment .markdown-body .emoji-img {
+      position: relative;
+      top: 4px;
+      height: 1.4em;
+      max-height: 1.4em;
+}
+.halo-comment .markdown-body .comment_inline_img {
+      cursor: pointer;
+      display: inline-block;
+      max-height: 150px;
+      margin-right: 3px;
+      padding: 3px;
+      background-color: #fff;
+      border: 1px solid var(--classC);
+      border-radius: 4px;
+}
+@media screen and (max-width: 880px) {
+.halo-comment .markdown-body {
+        padding-left: 0;
+}
+}
+.halo-comment .comment-editor {
+    -webkit-box-sizing: border-box;
+            box-sizing: border-box;
+    margin: 0 auto;
+    -webkit-animation: top20 500ms;
+            animation: top20 500ms;
+    /*--------------------------------------------------------------
+      # Commment Reply Form 
+    --------------------------------------------------------------*/
+}
+.halo-comment .comment-editor input:focus, .halo-comment .comment-editor input:active,
+    .halo-comment .comment-editor textarea:focus,
+    .halo-comment .comment-editor textarea:active {
+      outline: 0;
+}
+.halo-comment .comment-editor input::-webkit-input-placeholder,
+    .halo-comment .comment-editor textarea::-webkit-input-placeholder {
+      color: #999;
+}
+.halo-comment .comment-editor input::-moz-placeholder,
+    .halo-comment .comment-editor textarea::-moz-placeholder {
+      opacity: 1;
+      color: #999;
+}
+.halo-comment .comment-editor input::-ms-input-placeholder,
+    .halo-comment .comment-editor textarea::-ms-input-placeholder {
+      color: #999;
+}
+.halo-comment .comment-editor .comment-form {
+      outline: none;
+      /*--------------------------------------------------------------
+        # Commment Reply Form - Text
+      --------------------------------------------------------------*/
+      /*--------------------------------------------------------------
+       # Commment Reply Form - Body
+      --------------------------------------------------------------*/
+      /*--------------------------------------------------------------
+       # Commment Reply Form - AuthorInfo
+      --------------------------------------------------------------*/
+      /*--------------------------------------------------------------
+       # Commment Reply Form - SubmitButtom
+      --------------------------------------------------------------*/
+}
+.halo-comment .comment-editor .comment-form input,
+      .halo-comment .comment-editor .comment-form textarea {
+        font-size: 14px;
+        width: 31.3%;
+        margin: 0;
+        padding: 10px;
+        color: #535a63;
+        background-color: #f9f9f9;
+        border: 1px solid #ddd;
+}
+.halo-comment .comment-editor .comment-form textarea {
+        resize: vertical;
+        display: block;
+        float: none;
+        width: 100%;
+        height: 180px;
+        min-height: 100px;
+        margin-bottom: 10px;
+        color: #535a63;
+}
+.halo-comment .comment-editor .comment-form textarea:focus {
+          border-color: var(--theme);
+}
+.halo-comment .comment-editor .comment-form input {
+        width: 100%;
+}
+.halo-comment .comment-editor .comment-form input:last-of-type {
+          margin-right: 0;
+}
+.halo-comment .comment-editor .comment-form input:focus {
+          border-color: #cccccc;
+}
+.halo-comment .comment-editor .comment-form .comment-textarea {
+        position: relative;
+}
+.halo-comment .comment-editor .comment-form .comment-textarea .commentbody:focus {
+          border-color: var(--theme);
+          -webkit-transition: border-color 0.25s;
+          transition: border-color 0.25s;
+}
+.halo-comment .comment-editor .comment-form .comment-textarea .commentbody:placeholder-shown::-webkit-input-placeholder {
+          color: transparent;
+}
+.halo-comment .comment-editor .comment-form .comment-textarea .commentbody:placeholder-shown::-moz-placeholder {
+          color: transparent;
+}
+.halo-comment .comment-editor .comment-form .comment-textarea .commentbody:placeholder-shown:-ms-input-placeholder {
+          color: transparent;
+}
+.halo-comment .comment-editor .comment-form .comment-textarea .commentbody:placeholder-shown::-ms-input-placeholder {
+          color: transparent;
+}
+.halo-comment .comment-editor .comment-form .comment-textarea .commentbody:-moz-placeholder-shown::placeholder {
+          color: transparent;
+}
+.halo-comment .comment-editor .comment-form .comment-textarea .commentbody:-ms-input-placeholder::placeholder {
+          color: transparent;
+}
+.halo-comment .comment-editor .comment-form .comment-textarea .commentbody:placeholder-shown::placeholder {
+          color: transparent;
+}
+.halo-comment .comment-editor .comment-form .comment-textarea .commentbody:not(:-moz-placeholder-shown) ~ .input-label {
+          color: #fff;
+          background-color: var(--theme);
+          transform: scale(0.75) translate(-2px, -37px);
+          border-radius: 5px;
+}
+.halo-comment .comment-editor .comment-form .comment-textarea .commentbody:not(:-ms-input-placeholder) ~ .input-label {
+          color: #fff;
+          background-color: var(--theme);
+          transform: scale(0.75) translate(-2px, -37px);
+          border-radius: 5px;
+}
+.halo-comment .comment-editor .comment-form .comment-textarea .commentbody:not(:placeholder-shown) ~ .input-label,
+        .halo-comment .comment-editor .comment-form .comment-textarea .commentbody:focus ~ .input-label {
+          color: #fff;
+          background-color: var(--theme);
+          -webkit-transform: scale(0.75) translate(-2px, -37px);
+                  transform: scale(0.75) translate(-2px, -37px);
+          border-radius: 5px;
+}
+.halo-comment .comment-editor .comment-form .comment-textarea .input-label {
+          position: absolute;
+          left: 10px;
+          top: 10px;
+          color: #666;
+          padding: 0 6px;
+          -webkit-transform-origin: 0 0;
+                  transform-origin: 0 0;
+          pointer-events: none;
+          -webkit-transition: all 0.25s;
+          transition: all 0.25s;
+}
+.halo-comment .comment-editor .comment-form .comment-preview {
+        position: relative;
+        -webkit-box-sizing: border-box;
+                box-sizing: border-box;
+        display: block;
+        float: none;
+        width: 100%;
+        height: 180px;
+        margin: 0 0 10px;
+        padding: 10px;
+        white-space: pre-line;
+        word-break: break-word;
+        font-size: 14px !important;
+        line-height: 1.5;
+        overflow-y: auto;
+        -webkit-box-shadow: none;
+                box-shadow: none;
+        color: #535a63;
+        background: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 3px;
+}
+.halo-comment .comment-editor .comment-form .comment-preview img {
+          max-width: 100%;
+}
+.halo-comment .comment-editor .comment-form .author-info {
+        /*--------------------------------------------------------------
+         # Commment Reply Form - Popup
+        --------------------------------------------------------------*/
+}
+.halo-comment .comment-editor .comment-form .author-info .commentator {
+          position: absolute;
+          display: inline-block;
+          width: 38px;
+          height: 38px;
+          pointer-events: none;
+          margin-top: 10px;
+}
+.halo-comment .comment-editor .comment-form .author-info .commentator img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+}
+.halo-comment .comment-editor .comment-form .author-info .commentator .socila-check {
+            display: none;
+            width: 1.5em;
+            height: 1.5em;
+            font-size: 1em;
+            line-height: 1.5em;
+            text-align: center;
+            color: #fff;
+            border-radius: 50%;
+            position: absolute;
+            margin: -28px 0 0 42px;
+}
+.halo-comment .comment-editor .comment-form .author-info .commentator .gravatar-check {
+            background-color: #1e8cbe;
+            -webkit-transform: rotate(270deg);
+            transform: rotate(270deg);
+}
+.halo-comment .comment-editor .comment-form .author-info .commentator .qq-check {
+            background-color: #99ce00;
+}
+@media (max-width: 625px) {
+.halo-comment .comment-editor .comment-form .author-info .commentator {
+              display: none;
+}
+.halo-comment .comment-editor .comment-form .author-info .commentator .socila-check {
+                width: 1.5em;
+                height: 1.5em;
+                font-size: 0.5em;
+                line-height: 1.5em;
+                margin: -40% 0 0 77%;
+}
+}
+.halo-comment .comment-editor .comment-form .author-info .cmt-popup {
+          margin: 0 0 10px 1%;
+          -webkit-box-flex: 1;
+              -ms-flex: 1;
+                  flex: 1;
+          --widthB: calc(var(--widthA) - 71px);
+          --widthC: calc(var(--widthB) / 3);
+          width: var(--widthC);
+          margin-top: 10px;
+}
+.halo-comment .comment-editor .comment-form .author-info .cmt-popup.cmt-author {
+            margin-left: 54px;
+}
+@media (max-width: 625px) {
+.halo-comment .comment-editor .comment-form .author-info .cmt-popup {
+              margin: 0;
+              width: 100%;
+              margin-top: 15px;
+}
+.halo-comment .comment-editor .comment-form .author-info .cmt-popup.cmt-author {
+                margin-right: 8px;
+                margin-left: 0;
+}
+}
+@media (min-width: 625px) {
+.halo-comment .comment-editor .comment-form .author-info {
+            width: 100%;
+            display: -webkit-box;
+            display: -ms-flexbox;
+            display: flex;
+            -webkit-box-orient: horizontal;
+            -webkit-box-direction: normal;
+                -ms-flex-flow: row nowrap;
+                    flex-flow: row nowrap;
+            -webkit-box-pack: justify;
+                -ms-flex-pack: justify;
+                    justify-content: space-between;
+            -webkit-box-align: stretch;
+                -ms-flex-align: stretch;
+                    align-items: stretch;
+}
+}
+.halo-comment .comment-editor .comment-form .comment-buttons {
+        font-size: 14px;
+        text-align: right;
+        margin-top: 10px;
+}
+.halo-comment .comment-editor .comment-form .comment-buttons .middle {
+          display: inline-block;
+          vertical-align: middle;
+}
+.halo-comment .comment-editor .comment-form .comment-buttons .button-submit,
+        .halo-comment .comment-editor .comment-form .comment-buttons .button-preview-edit {
+          opacity: 0.9;
+          display: inline-block;
+          margin-left: 5px;
+          color: #fff;
+          font-weight: 500;
+          padding: 4px 12px;
+          text-transform: uppercase;
+          background: var(--theme);
+          border: 1px solid var(--theme);
+          border-radius: 4px;
+          -webkit-animation: bottom20 500ms;
+                  animation: bottom20 500ms;
+          -webkit-transition: all 0.3s ease 0s;
+          transition: all 0.3s ease 0s;
+}
+.halo-comment .comment-editor .comment-form .comment-buttons .button-submit:hover,
+          .halo-comment .comment-editor .comment-form .comment-buttons .button-preview-edit:hover {
+            opacity: 1;
+            font-weight: 700;
+            letter-spacing: 3px;
+            -webkit-box-shadow: 0px 5px 40px -10px rgba(0, 0, 0, 0.57);
+                    box-shadow: 0px 5px 40px -10px rgba(0, 0, 0, 0.57);
+            -webkit-transition: all 0.3s ease 0s;
+            transition: all 0.3s ease 0s;
+}
+.halo-comment .comment-editor .comment-form .comment-buttons .button-cancel-reply {
+          opacity: .9;
+          display: inline-block;
+          color: var(--minor);
+          font-weight: 500;
+          padding: 4px 12px;
+          text-transform: uppercase;
+          background: transparent;
+          border: 1px solid var(--minor);
+          border-radius: 4px;
+          -webkit-animation: bottom20 .5s;
+                  animation: bottom20 .5s;
+          -webkit-transition: all .3s ease 0s;
+          transition: all .3s ease 0s;
+}
+.halo-comment .comment-editor .comment-form .comment-buttons .button-cancel-reply:hover {
+            opacity: 1;
+            font-weight: 700;
+            letter-spacing: 3px;
+            -webkit-box-shadow: 0px 5px 40px -10px rgba(0, 0, 0, 0.57);
+                    box-shadow: 0px 5px 40px -10px rgba(0, 0, 0, 0.57);
+            -webkit-transition: all 0.3s ease 0s;
+            transition: all 0.3s ease 0s;
+}
+@media (max-width: 1080px) {
+.halo-comment .comment-editor input {
+        width: 100%;
+        margin-bottom: 14px;
+}
+}
+.halo-comment .comment-empty {
+    margin: 30px 0;
+    text-align: center;
+    color: #999;
+}
+.halo-comment .comment-page {
+    padding-top: 20px;
+    text-align: center;
+    border-top: 3px solid var(--classD);
+}
+.halo-comment .comment-page .page {
+      display: inline-block;
+      padding: 10px 0;
+      margin: 0;
+}
+.halo-comment .comment-page .page li {
+        display: inline;
+        margin: 0 3px;
+        color: var(--main);
+}
+.halo-comment .comment-page .page button {
+        position: relative;
+        font-size: inherit;
+        font-family: inherit;
+        height: 32px;
+        padding: 4px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: normal;
+        color: var(--main);
+        background-color: var(--sub-background);
+        border: 1px solid var(--classE);
+}
+.halo-comment .comment-page .page button svg {
+          display: none;
+          fill: var(--main);
+}
+.halo-comment .comment-page .page button:hover {
+          color: var(--theme);
+          border-color: var(--theme);
+}
+.halo-comment .comment-page .page button:hover svg {
+            fill: var(--theme);
+}
+.halo-comment .comment-page .page button.prev-button:before {
+          display: block;
+          content: "上一页";
+}
+.halo-comment .comment-page .page button.next-button:before {
+          display: block;
+          content: "下一页";
+}
+.halo-comment .comment-page .page .active {
+        color: var(--theme);
+        border-color: var(--theme);
+}
+@media (max-width: 500px) {
+.halo-comment .comment-page .page button {
+        height: 32px;
+        padding: 4px 8px;
+}
+.halo-comment .comment-page .page button.prev-button {
+          position: relative;
+          top: 4px;
+}
+.halo-comment .comment-page .page button.prev-button:before {
+            display: none;
+}
+.halo-comment .comment-page .page button.prev-button svg {
+            display: block;
+}
+.halo-comment .comment-page .page button.next-button {
+          position: relative;
+          top: 4px;
+}
+.halo-comment .comment-page .page button.next-button:before {
+            display: none;
+}
+.halo-comment .comment-page .page button.next-button svg {
+            display: block;
+}
+}
+.halo-comment.halo-comment__small .comment-wrp {
+    padding: 10px 0;
+}
+.halo-comment.dark .avatar {
+    background-color: #3e3e3e;
+}
+.halo-comment.dark input::-webkit-input-placeholder,
+  .halo-comment.dark textarea::-webkit-input-placeholder {
+    color: #777;
+}
+.halo-comment.dark input::-moz-placeholder,
+  .halo-comment.dark textarea::-moz-placeholder {
+    color: #777;
+}
+.halo-comment.dark input::-ms-input-placeholder,
+  .halo-comment.dark textarea::-ms-input-placeholder {
+    color: #777;
+}
+.halo-comment.dark .comment-editor .comment-textarea textarea {
+    color: #b3b3b3;
+    background: #2e2e2e;
+    border-color: #555;
+}
+.halo-comment.dark .comment-editor #emotion-toggle {
+    color: #ccc;
+}
+.halo-comment.dark .comment-editor .author-info input {
+    color: #b3b3b3;
+    background: #2e2e2e;
+    border-color: #555;
+}
+.halo-comment.dark .comment-wrp {
+    border-color: #4e4e4e;
+}
+.halo-comment.dark .comment-wrp .commeta .info {
+      color: #848484;
+}
+.halo-comment.dark .comment-wrp .commeta .comment-time {
+      color: #848484;
+}
+.halo-comment.dark .comment-editor .comment-form .comment-preview {
+    color: #b3b3b3;
+    background: #2e2e2e;
+    border-color: #555;
+}
+.halo-comment.dark .comment-empty {
+    color: #666;
+}
+.halo-comment.dark .comment .body p {
+    color: #999;
+}
+
+/*--------------------------------------------------------------
+# Commment Reply Form - Emoji
+--------------------------------------------------------------*/
+#emotion-toggle {
+  cursor: pointer;
+  text-align: center;
+  margin-bottom: 5px;
+}
+#container-emoji {
+  background: var(--sub-background);
+}
+.emoji-fade-enter-active,
+.emoji-fade-leave-active {
+  -webkit-transition: all 0.8s ease;
+  transition: all 0.8s ease;
+}
+.emoji-fade-enter,
+.emoji-fade-leave-to {
+  opacity: 0;
+  -webkit-transform: translateY(-10px);
+          transform: translateY(-10px);
+}
+.emotion-box {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: horizontal;
+  -webkit-box-direction: normal;
+  -ms-flex-direction: row;
+  flex-direction: row;
+  -ms-flex-wrap: wrap;
+  flex-wrap: wrap;
+  /*--------------------------------------------------------------
+    # Emoji Category
+    --------------------------------------------------------------*/
+  /*--------------------------------------------------------------
+    # Emoji List
+    --------------------------------------------------------------*/
+}
+.emotion-box .category-enter,
+  .emotion-box .category-leave-to {
+    opacity: 0;
+}
+.emotion-box .category-enter-active,
+  .emotion-box .category-leave-active {
+    -webkit-transition: all 0.2s ease;
+    transition: all 0.2s ease;
+}
+.emotion-box .category-enter {
+    -webkit-transform: translateX(10px);
+            transform: translateX(10px);
+}
+.emotion-box .category-leave-to {
+    -webkit-transform: translateX(-10px);
+            transform: translateX(-10px);
+}
+.emotion-box .motion-switcher-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 0;
+    table-layout: fixed;
+}
+.emotion-box .motion-switcher-table tr {
+      color: #e2e2e2;
+      color: var(--classF);
+}
+.emotion-box .motion-switcher-table th,
+    .emotion-box .motion-switcher-table td {
+      cursor: pointer;
+      padding: 8px;
+      text-align: center;
+      border-radius: 5px 5px 0 0;
+}
+.emotion-box .motion-switcher-table th:hover {
+      color: var(--theme);
+}
+.emotion-box .motion-switcher-table .on-hover {
+      color: var(--theme);
+      background-color: rgba(245, 245, 245, 0.5);
+      background-color: var(--sub-background);
+}
+.emotion-box .motion-container {
+    height: 110px;
+    overflow: auto;
+    margin-bottom: 5px;
+    padding: 6px 6px 0 16px;
+    border-radius: 0 0 5px 5px;
+}
+.emotion-box .motion-container .emoji-item {
+      cursor: pointer;
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      padding: 3px;
+      margin: 3px;
+      overflow: hidden;
+      color: #333;
+      color: var(--main);
+      border-radius: 4px;
+}
+@media (max-width: 860px) {
+.emotion-box .motion-container .emoji-item {
+          -webkit-transform: scale(0.8);
+                  transform: scale(0.8);
+          margin-bottom: -10px;
+}
+}
+.emotion-box .motion-container .emoji-item img {
+        display: block;
+        max-width: 100%;
+        width: auto;
+        height: 26px;
+        margin: 3px auto 0;
+        border: 0;
+}
+.emotion-box .motion-container .emoji-item:hover {
+        background-color: #e9e9e9;
+        background-color: var(--classB);
+}
+.emotion-box .motion-container .emoji-item.text {
+        width: auto;
+        height: auto;
+        padding: 2px 6px;
+        font-size: 14px;
+}
+.emotion-box .motion-container .emotion-secter,
+    .emotion-box .motion-container .emoji-animate {
+      width: 32px;
+      height: 32px;
+}
+.emotion-box .motion-container .emotion-secter .img,
+      .emotion-box .motion-container .emoji-animate .img {
+        width: 32px;
+        height: 864px;
+        max-width: 32px;
+        background: top/32px no-repeat;
+        background-image: none;
+        -webkit-animation: im-emotion-step 1.08s steps(27) infinite;
+                animation: im-emotion-step 1.08s steps(27) infinite;
+}
+@media (max-width: 860px) {
+.emotion-box .motion-container .emotion-secter,
+        .emotion-box .motion-container .emoji-animate {
+          -webkit-transform: scale(0.8);
+                  transform: scale(0.8);
+          margin-bottom: -10px;
+}
+}
+@media (max-width: 860px) {
+.emotion-box .motion-container.bilibili-container, .emotion-box .motion-container.tieba-container, .emotion-box .motion-container.haha-container {
+        padding-left: 0;
+}
+}
+.emotion-box .motion-container.haha-container img {
+      height: 24px;
+}
+.emotion-box .motion-container a {
+      background-color: transparent;
+      text-decoration: none;
+}
+.emotion-box .motion-container a {
+      color: #e67474;
+      outline: none;
+      -webkit-transition: color 0.2s ease-out, border 0.2s ease-out, opacity 0.2s ease-out;
+      transition: color 0.2s ease-out, border 0.2s ease-out, opacity 0.2s ease-out;
+}
+.emotion-box .motion-container .emotion-select-parent {
+      overflow: hidden;
+      padding: 1px 2px;
+      background-size: 32px auto;
+      background-repeat: no-repeat;
+      background-position: center;
+}
+.emotion-box .motion-container .emotion-select-parent:hover {
+        background-image: none !important;
+}
+.emotion-box .motion-container .emotion-select-parent:hover .emotion-select-child {
+          display: block;
+}
+.emotion-box .motion-container .emotion-select-child {
+      display: none;
+}
+.emotion-box .motion-container .emotion-secter {
+      margin: 12px 12px 0 0;
+}
+@media (max-width: 860px) {
+.emotion-box .motion-container .emotion-secter {
+          margin: 0;
+}
+.emotion-box .motion-container .emotion-secter .emotion-select-parent:hover {
+            background-image: none !important;
+            -webkit-transform: scale(0.6, 0.6);
+            transform: scale(0.6, 0.6);
+}
+}
+
+/*--------------------------------------------------------------
+# Popup
+--------------------------------------------------------------*/
+.popup {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+.popup .popuptext {
+    width: auto;
+    padding: 8px 10px;
+    background-color: #555;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    position: absolute;
+    z-index: 1;
+    bottom: 110%;
+    left: 50%;
+    margin-left: -80px;
+}
+.popup .popuptext:after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      margin-left: -5px;
+      border-width: 5px;
+      border-style: solid;
+      border-color: #555 transparent transparent;
+}
+.popup .fade-enter-active,
+  .popup .fade-enter-to {
+    -webkit-transition: opacity 1s;
+    transition: opacity 1s;
+}
+.popup .fade-enter,
+  .popup .fade-leave-to {
+    opacity: 0;
+}
+
+/*--------------------------------------------------------------
+# Default Tips
+--------------------------------------------------------------*/
+.butterBar {
+  position: absolute;
+  text-align: center;
+  top: 10px;
+  right: 0px;
+  z-index: 1000;
+}
+.butterBar.butterBar-center {
+    margin: auto;
+}
+.butterBar .butterBar-message {
+    display: inline-block;
+    margin: 0;
+    padding: 8px 20px;
+    font-size: 14px;
+    color: #fff;
+    background: #fe9600;
+    border-radius: 18px 0 0 18px;
+    -webkit-box-shadow: -2px 4px 10px -5px #f74009;
+            box-shadow: -2px 4px 10px -5px #f74009;
+    -webkit-animation: dung 0.3s 0.1s 2 linear;
+            animation: dung 0.3s 0.1s 2 linear;
+}
+.butterBar .butterBar-message.success {
+      background: #31c560;
+      -webkit-box-shadow: -2px 4px 10px -5px #07600a;
+              box-shadow: -2px 4px 10px -5px #07600a;
+}
+.butterBar .butterBar-message.danger {
+      background: #e74b32;
+      -webkit-box-shadow: -2px 4px 10px -5px #e10000;
+              box-shadow: -2px 4px 10px -5px #e10000;
+}
+
+/*--------------------------------------------------------------
+# Keyframes
+--------------------------------------------------------------*/
+@-webkit-keyframes main {
+0% {
+    opacity: 0;
+    -webkit-transform: translateY(50px);
+            transform: translateY(50px);
+}
+100% {
+    opacity: 1;
+    -webkit-transform: translateY(0);
+            transform: translateY(0);
+}
+}
+@keyframes main {
+0% {
+    opacity: 0;
+    -webkit-transform: translateY(50px);
+            transform: translateY(50px);
+}
+100% {
+    opacity: 1;
+    -webkit-transform: translateY(0);
+            transform: translateY(0);
+}
+}
+@-webkit-keyframes dung {
+0% {
+    -webkit-transform: translateY(0);
+    transform: translateY(0);
+}
+30% {
+    -webkit-transform: translateY(-3px);
+    transform: translateY(-3px);
+}
+60% {
+    -webkit-transform: translateY(2px);
+    transform: translateY(2px);
+}
+80% {
+    -webkit-transform: translateY(-1px);
+    transform: translateY(-1px);
+}
+90% {
+    -webkit-transform: translateY(1px);
+    transform: translateY(1px);
+}
+100% {
+    -webkit-transform: translateY(0);
+    transform: translateY(0);
+}
+}
+@keyframes dung {
+0% {
+    -webkit-transform: translateY(0);
+    transform: translateY(0);
+}
+30% {
+    -webkit-transform: translateY(-3px);
+    transform: translateY(-3px);
+}
+60% {
+    -webkit-transform: translateY(2px);
+    transform: translateY(2px);
+}
+80% {
+    -webkit-transform: translateY(-1px);
+    transform: translateY(-1px);
+}
+90% {
+    -webkit-transform: translateY(1px);
+    transform: translateY(1px);
+}
+100% {
+    -webkit-transform: translateY(0);
+    transform: translateY(0);
+}
+}
+@-webkit-keyframes bottom20 {
+0% {
+    opacity: 0;
+    -webkit-transform: translateY(20px);
+            transform: translateY(20px);
+}
+100% {
+    opacity: 1;
+    -webkit-transform: translateY(0);
+            transform: translateY(0);
+}
+}
+@keyframes bottom20 {
+0% {
+    opacity: 0;
+    -webkit-transform: translateY(20px);
+            transform: translateY(20px);
+}
+100% {
+    opacity: 1;
+    -webkit-transform: translateY(0);
+            transform: translateY(0);
+}
+}
+@-webkit-keyframes wave {
+from {
+    -webkit-transform: translateY(-100%);
+            transform: translateY(-100%);
+}
+to {
+    -webkit-transform: translateY(100%);
+            transform: translateY(100%);
+}
+}
+@keyframes wave {
+from {
+    -webkit-transform: translateY(-100%);
+            transform: translateY(-100%);
+}
+to {
+    -webkit-transform: translateY(100%);
+            transform: translateY(100%);
+}
+}
+@-webkit-keyframes im-emotion-step {
+0% {
+    -webkit-transform: translateY(0);
+    transform: translateY(0);
+}
+to {
+    -webkit-transform: translateY(-100%);
+    transform: translateY(-100%);
+}
+}
+@keyframes im-emotion-step {
+0% {
+    -webkit-transform: translateY(0);
+    transform: translateY(0);
+}
+to {
+    -webkit-transform: translateY(-100%);
+    transform: translateY(-100%);
+}
+}
+@-webkit-keyframes top20 {
+0% {
+    opacity: 0;
+    -webkit-transform: translateY(-20px);
+            transform: translateY(-20px);
+}
+100% {
+    opacity: 1;
+    -webkit-transform: translateY(0);
+            transform: translateY(0);
+}
+}
+@keyframes top20 {
+0% {
+    opacity: 0;
+    -webkit-transform: translateY(-20px);
+            transform: translateY(-20px);
+}
+100% {
+    opacity: 1;
+    -webkit-transform: translateY(0);
+            transform: translateY(0);
+}
+}
+</style><div id="halo-comment" class="halo-comment"><section id="respond-0" role="form" class="comment-editor bottom-comment"><form class="comment-form"><div class="comment-textarea"><textarea required="required" aria-required="true" tabindex="4" placeholder="你是我一生只会遇见一次的惊喜 ..." class="commentbody"></textarea><label class="input-label">你是我一生只会遇见一次的惊喜 ...</label></div><div id="upload-img-show"></div><p id="emotion-toggle" class="no-select"><span>戳我试试 OωO</span></p><!----><div class="author-info"><div class="commentator"><img src="https://sdn.geekzu.org/avatar/d41d8cd98f00b204e9800998ecf8427e?s=256&amp;d=mm" class="avatar"><div class="socila-check gravatar-check"><i aria-hidden="true" class="fa fa-google"></i></div></div><div class="popup cmt-popup cmt-author" id="author"><span class="popuptext" style="margin-left: -115px; display: none;"> 你的昵称是啥呢？ </span><input type="text" required="required" aria-required="true" placeholder="* 昵称"></div><div class="popup cmt-popup" id="email"><span class="popuptext" style="margin-left: -65px; display: none;"> 你将收到回复通知 </span><input type="text" required="required" aria-required="true" placeholder="* 邮箱"></div><div class="popup cmt-popup" id="url"><span class="popuptext" style="margin-left: -55px; display: none;"> 禁止小广告😀 </span><input type="text" required="required" aria-required="true" placeholder="个人站点"></div></div><ul class="comment-buttons"><!----><!----><li class="middle"><a href="javascript:;" tabindex="5" rel="nofollow noopener" class="button-submit">提交</a></li></ul></form></section><!----><div class="comment-loader-container" style="display: none;"><div class="comment-loader-default"><span></span><span></span><span></span><span></span></div></div><!----><div class="comment-empty"> 暂无评论 </div><!----></div></template>
+  </halo-comment></div>
+            </div>
+        </div>
+<aside class="joe_aside">
+  <section class="joe_aside__item author">
+  <img width="100%" height="120" class="image ls-is-cached lazyloaded" data-src="/themes/joe2.0/source/img/author_bg.jpg" src="./2、ReentrantLock源码解析_files/author_bg.jpg" onerror="Joe.errorImg(this)" alt="博主栏壁纸">
+  <div class="user">
+    <div class="avatar_wrapper circle">
+      <img class="avatar lazyloaded" data-src="/upload/2022/05/4.jpg" src="./2、ReentrantLock源码解析_files/4.jpg" onerror="Joe.errorImg(this)" alt="博主头像">
+    </div>
+    <a class="link" href="http://blog.shangsw.com/" target="_blank" rel="noopener noreferrer nofollow">
+      林雷<img class="level" src="./2、ReentrantLock源码解析_files/level_4.svg" onerror="Joe.errorImg(this)" alt="博主等级">
+    </a>
+      <p class="motto joe_motto"> 斜月沉沉藏海雾，碣石潇湘无限路</p>
+  </div>
+  <div class="count">
+        <div class="item" title="累计分类数 7">
+          <span class="num">7</span>
+          <span>分类数</span>
+        </div>
+        <div class="item" title="累计文章数 132">
+          <span class="num">132</span>
+          <span>文章数</span>
+        </div>
+        <div class="item" title="累计评论数 3">
+          <span class="num">3</span>
+          <span>评论数</span>
+        </div>
+  </div>
+  <div class="social-account">
+      <a class="github" href="https://github.com/linmeitianqing" target="_blank" title="Github" rel="noopener noreferrer nofollow">
+        <svg viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><path d="M512 95.872a426.666667 426.666667 0 0 0-134.912 831.445333c21.333333 3.754667 29.312-9.045333 29.312-20.266666 0-10.112-0.512-43.733333-0.512-79.445334-107.221333 19.712-134.954667-26.154667-143.488-50.133333a155.136 155.136 0 0 0-43.733333-60.288c-14.933333-7.978667-36.266667-27.733333-0.554667-28.245333a85.376 85.376 0 0 1 65.621333 43.733333 91.178667 91.178667 0 0 0 124.245334 35.2 89.770667 89.770667 0 0 1 27.221333-57.088c-94.933333-10.666667-194.133333-47.445333-194.133333-210.645333a166.058667 166.058667 0 0 1 43.733333-114.688 153.344 153.344 0 0 1 4.266667-113.066667s35.712-11.178667 117.333333 43.733333a402.218667 402.218667 0 0 1 213.333333 0c81.578667-55.466667 117.333333-43.733333 117.333334-43.733333a153.301333 153.301333 0 0 1 4.266666 113.066667 165.077333 165.077333 0 0 1 43.733334 114.688c0 163.712-99.754667 199.978667-194.688 210.645333a101.034667 101.034667 0 0 1 28.8 78.933333c0 57.088-0.512 102.954667-0.512 117.333334 0 11.221333 7.978667 24.533333 29.312 20.266666A426.88 426.88 0 0 0 512 95.872z" fill="var(--title)"></path></svg>
+      </a>
+      <a class="juejin" href="https://juejin.cn/user/4248942900163198" target="_blank" title="掘金社区" rel="noopener noreferrer nofollow">
+        <svg viewBox="0 0 32 24" version="1.1" xmlns="http://www.w3.org/2000/svg" width="22" height="22"><path d="M15.0737 5.80396H15.0757L18.706 2.91722L15.0757 0.00406298L15.0717 0L11.4475 2.91112L15.0717 5.80193L15.0737 5.80396ZM15.0757 14.9111L15.0778 14.9091L24.4429 7.52057L21.9036 5.48096L15.0778 10.8664L15.0757 10.8685L15.0737 10.8705L8.2479 5.48502L5.71057 7.52463L15.0737 14.9132L15.0757 14.9111ZM15.0716 19.9614L15.0757 19.9593L27.614 10.066L30.1534 12.1056L24.449 16.6053L15.0757 24L0.243779 12.3047L0 12.1117L2.53936 10.0721L15.0716 19.9614Z" fill="#1E80FF"></path></svg>
+      </a>
+      <a class="qq" href="http://wpa.qq.com/msgrd?v=3&amp;uin=1336706009&amp;site=qq&amp;menu=yes" target="_blank" title="QQ" rel="noopener noreferrer nofollow">
+        <svg viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="20" height="22"><path d="M511.09761 957.257c-80.159 0-153.737-25.019-201.11-62.386-24.057 6.702-54.831 17.489-74.252 30.864-16.617 11.439-14.546 23.106-11.55 27.816 13.15 20.689 225.583 13.211 286.912 6.767v-3.061z" fill="#FAAD08"></path><path d="M496.65061 957.257c80.157 0 153.737-25.019 201.11-62.386 24.057 6.702 54.83 17.489 74.253 30.864 16.616 11.439 14.543 23.106 11.55 27.816-13.15 20.689-225.584 13.211-286.914 6.767v-3.061z" fill="#FAAD08"></path><path d="M497.12861 474.524c131.934-0.876 237.669-25.783 273.497-35.34 8.541-2.28 13.11-6.364 13.11-6.364 0.03-1.172 0.542-20.952 0.542-31.155C784.27761 229.833 701.12561 57.173 496.64061 57.162 292.15661 57.173 209.00061 229.832 209.00061 401.665c0 10.203 0.516 29.983 0.547 31.155 0 0 3.717 3.821 10.529 5.67 33.078 8.98 140.803 35.139 276.08 36.034h0.972z" fill="#000000"></path><path d="M860.28261 619.782c-8.12-26.086-19.204-56.506-30.427-85.72 0 0-6.456-0.795-9.718 0.148-100.71 29.205-222.773 47.818-315.792 46.695h-0.962C410.88561 582.017 289.65061 563.617 189.27961 534.698 185.44461 533.595 177.87261 534.063 177.87261 534.063 166.64961 563.276 155.56661 593.696 147.44761 619.782 108.72961 744.168 121.27261 795.644 130.82461 796.798c20.496 2.474 79.78-93.637 79.78-93.637 0 97.66 88.324 247.617 290.576 248.996a718.01 718.01 0 0 1 5.367 0C708.80161 950.778 797.12261 800.822 797.12261 703.162c0 0 59.284 96.111 79.783 93.637 9.55-1.154 22.093-52.63-16.623-177.017" fill="#000000"></path><path d="M434.38261 316.917c-27.9 1.24-51.745-30.106-53.24-69.956-1.518-39.877 19.858-73.207 47.764-74.454 27.875-1.224 51.703 30.109 53.218 69.974 1.527 39.877-19.853 73.2-47.742 74.436m206.67-69.956c-1.494 39.85-25.34 71.194-53.24 69.956-27.888-1.238-49.269-34.559-47.742-74.435 1.513-39.868 25.341-71.201 53.216-69.974 27.909 1.247 49.285 34.576 47.767 74.453" fill="#FFFFFF"></path><path d="M683.94261 368.627c-7.323-17.609-81.062-37.227-172.353-37.227h-0.98c-91.29 0-165.031 19.618-172.352 37.227a6.244 6.244 0 0 0-0.535 2.505c0 1.269 0.393 2.414 1.006 3.386 6.168 9.765 88.054 58.018 171.882 58.018h0.98c83.827 0 165.71-48.25 171.881-58.016a6.352 6.352 0 0 0 1.002-3.395c0-0.897-0.2-1.736-0.531-2.498" fill="#FAAD08"></path><path d="M467.63161 256.377c1.26 15.886-7.377 30-19.266 31.542-11.907 1.544-22.569-10.083-23.836-25.978-1.243-15.895 7.381-30.008 19.25-31.538 11.927-1.549 22.607 10.088 23.852 25.974m73.097 7.935c2.533-4.118 19.827-25.77 55.62-17.886 9.401 2.07 13.75 5.116 14.668 6.316 1.355 1.77 1.726 4.29 0.352 7.684-2.722 6.725-8.338 6.542-11.454 5.226-2.01-0.85-26.94-15.889-49.905 6.553-1.579 1.545-4.405 2.074-7.085 0.242-2.678-1.834-3.786-5.553-2.196-8.135" fill="#000000"></path><path d="M504.33261 584.495h-0.967c-63.568 0.752-140.646-7.504-215.286-21.92-6.391 36.262-10.25 81.838-6.936 136.196 8.37 137.384 91.62 223.736 220.118 224.996H506.48461c128.498-1.26 211.748-87.612 220.12-224.996 3.314-54.362-0.547-99.938-6.94-136.203-74.654 14.423-151.745 22.684-215.332 21.927" fill="#FFFFFF"></path><path d="M323.27461 577.016v137.468s64.957 12.705 130.031 3.91V591.59c-41.225-2.262-85.688-7.304-130.031-14.574" fill="#EB1C26"></path><path d="M788.09761 432.536s-121.98 40.387-283.743 41.539h-0.962c-161.497-1.147-283.328-41.401-283.744-41.539l-40.854 106.952c102.186 32.31 228.837 53.135 324.598 51.926l0.96-0.002c95.768 1.216 222.4-19.61 324.6-51.924l-40.855-106.952z" fill="#EB1C26"></path></svg>
+      </a>
+      <a class="email" href="mailto:linlixishang@163.com" target="_blank" title="邮箱" rel="noopener noreferrer nofollow">
+        <svg viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="21" height="22"><path d="M512 938.666667C276.352 938.666667 85.333333 747.648 85.333333 512S276.352 85.333333 512 85.333333s426.666667 191.018667 426.666667 426.666667-191.018667 426.666667-426.666667 426.666667z m341.333333-426.666667a341.333333 341.333333 0 1 0-169.301333 294.869333l-43.008-73.685333A256 256 0 1 1 768 512v42.666667a42.666667 42.666667 0 0 1-85.333333 0V384h-57.770667a170.666667 170.666667 0 1 0 2.816 253.44A128 128 0 0 0 853.333333 554.666667v-42.666667z m-341.333333-85.333333a85.333333 85.333333 0 1 1 0 170.666666 85.333333 85.333333 0 0 1 0-170.666666z" fill="#dc4835"></path></svg>
+      </a>
+  </div>
+    <canvas id="canvas-strips" width="300" height="340"></canvas>
+    <script src="./2、ReentrantLock源码解析_files/strips.js.下载"></script>
+</section>  <div class="joe_aside_post">
+      <div class="toc-container" style="display: block;">
+        <h3 class="toc-header"><i class="joe-font joe-icon-xiaoxi" title="文章目录"></i>文章目录</h3>
+        <div id="js-toc" class="toc"><ol class="toc-list "><li class="toc-list-item is-active-li"><a title="一 ReentrantLock总览" href="http://blog.shangsw.com/archives/reentrantlockhtml#%E4%B8%80-reentrantlock%E6%80%BB%E8%A7%88" class="toc-link node-name--H1  is-active-link">一 ReentrantLock总览</a><ol class="toc-list "><li class="toc-list-item"><a title="1.1 ReentrantLock简介" href="http://blog.shangsw.com/archives/reentrantlockhtml#1.1-reentrantlock%E7%AE%80%E4%BB%8B" class="toc-link node-name--H2 ">1.1 ReentrantLock简介</a><ol class="toc-list "><li class="toc-list-item"><a title="1.1.1 Lock接口" href="http://blog.shangsw.com/archives/reentrantlockhtml#1.1.1-lock%E6%8E%A5%E5%8F%A3" class="toc-link node-name--H3 ">1.1.1 Lock接口</a></li></ol></li></ol></li><li class="toc-list-item"><a title="二 ReentrantLock源码" href="http://blog.shangsw.com/archives/reentrantlockhtml#%E4%BA%8C-reentrantlock%E6%BA%90%E7%A0%81" class="toc-link node-name--H1 ">二 ReentrantLock源码</a><ol class="toc-list "><li class="toc-list-item"><a title="2.1 AQS的实现类Sync" href="http://blog.shangsw.com/archives/reentrantlockhtml#2.1-aqs%E7%9A%84%E5%AE%9E%E7%8E%B0%E7%B1%BBsync" class="toc-link node-name--H2 ">2.1 AQS的实现类Sync</a></li><li class="toc-list-item"><a title="2.2 lock加锁" href="http://blog.shangsw.com/archives/reentrantlockhtml#2.2-lock%E5%8A%A0%E9%94%81" class="toc-link node-name--H2 ">2.2 lock加锁</a><ol class="toc-list "><li class="toc-list-item"><a title="2.2.1 公平锁" href="http://blog.shangsw.com/archives/reentrantlockhtml#2.2.1-%E5%85%AC%E5%B9%B3%E9%94%81" class="toc-link node-name--H3 ">2.2.1 公平锁</a></li><li class="toc-list-item"><a title="2.2.2 非公平锁" href="http://blog.shangsw.com/archives/reentrantlockhtml#2.2.2-%E9%9D%9E%E5%85%AC%E5%B9%B3%E9%94%81" class="toc-link node-name--H3 ">2.2.2 非公平锁</a></li></ol></li><li class="toc-list-item"><a title="2.3 lockInterruptibly可中断式获取锁" href="http://blog.shangsw.com/archives/reentrantlockhtml#2.3-lockinterruptibly%E5%8F%AF%E4%B8%AD%E6%96%AD%E5%BC%8F%E8%8E%B7%E5%8F%96%E9%94%81" class="toc-link node-name--H2 ">2.3 lockInterruptibly可中断式获取锁</a></li><li class="toc-list-item"><a title="2.4 tryLock尝试获取锁" href="http://blog.shangsw.com/archives/reentrantlockhtml#2.4-trylock%E5%B0%9D%E8%AF%95%E8%8E%B7%E5%8F%96%E9%94%81" class="toc-link node-name--H2 ">2.4 tryLock尝试获取锁</a></li><li class="toc-list-item"><a title="2.5 unlock释放锁" href="http://blog.shangsw.com/archives/reentrantlockhtml#2.5-unlock%E9%87%8A%E6%94%BE%E9%94%81" class="toc-link node-name--H2 ">2.5 unlock释放锁</a></li><li class="toc-list-item"><a title="2.6 其他方法" href="http://blog.shangsw.com/archives/reentrantlockhtml#2.6-%E5%85%B6%E4%BB%96%E6%96%B9%E6%B3%95" class="toc-link node-name--H2 ">2.6 其他方法</a><ol class="toc-list "><li class="toc-list-item"><a title="2.6.1 创建条件等待队列" href="http://blog.shangsw.com/archives/reentrantlockhtml#2.6.1-%E5%88%9B%E5%BB%BA%E6%9D%A1%E4%BB%B6%E7%AD%89%E5%BE%85%E9%98%9F%E5%88%97" class="toc-link node-name--H3 ">2.6.1 创建条件等待队列</a></li><li class="toc-list-item"><a title="2.6.2 判断是否有线程持有锁" href="http://blog.shangsw.com/archives/reentrantlockhtml#2.6.2-%E5%88%A4%E6%96%AD%E6%98%AF%E5%90%A6%E6%9C%89%E7%BA%BF%E7%A8%8B%E6%8C%81%E6%9C%89%E9%94%81" class="toc-link node-name--H3 ">2.6.2 判断是否有线程持有锁</a></li><li class="toc-list-item"><a title="2.6.3 获取持有锁的线程" href="http://blog.shangsw.com/archives/reentrantlockhtml#2.6.3-%E8%8E%B7%E5%8F%96%E6%8C%81%E6%9C%89%E9%94%81%E7%9A%84%E7%BA%BF%E7%A8%8B" class="toc-link node-name--H3 ">2.6.3 获取持有锁的线程</a></li><li class="toc-list-item"><a title="2.6.4 获取同步队列的长度" href="http://blog.shangsw.com/archives/reentrantlockhtml#2.6.4-%E8%8E%B7%E5%8F%96%E5%90%8C%E6%AD%A5%E9%98%9F%E5%88%97%E7%9A%84%E9%95%BF%E5%BA%A6" class="toc-link node-name--H3 ">2.6.4 获取同步队列的长度</a></li></ol></li></ol></li></ol></div>
+      </div>
+  <section class="joe_aside__item newest">
+    <div class="joe_aside__item-title">
+      <i class="joe-font joe-icon-huo"></i>
+      <span class="text">相关文章</span>
+    </div>
+    <div class="joe_aside__item-contain"> 
+        <ul class="list">       
+              <li class="item">
+                <a class="link" target="_blank" href="http://blog.shangsw.com/archives/concurrenthashmaphtml" title="14、ConcurrentHashMap核心源码解析">14、ConcurrentHashMap核心源码解析</a>
+                <i class="joe-font joe-icon-link"></i>
+              </li>
+              <li class="item">
+                <a class="link" target="_blank" href="http://blog.shangsw.com/archives/scheduledthreadpoolexecutorhtml" title="11、ScheduledThreadPoolExecutor源码解析">11、ScheduledThreadPoolExecutor源码解析</a>
+                <i class="joe-font joe-icon-link"></i>
+              </li>
+              <li class="item">
+                <a class="link" target="_blank" href="http://blog.shangsw.com/archives/aqshtml" title="1、AbstractQueuedSynchronizer原理分析">1、AbstractQueuedSynchronizer原理分析</a>
+                <i class="joe-font joe-icon-link"></i>
+              </li>
+              <li class="item">
+                <a class="link" target="_blank" href="http://blog.shangsw.com/archives/countdownlatchhtml" title="3、CountDownLatch源码解析">3、CountDownLatch源码解析</a>
+                <i class="joe-font joe-icon-link"></i>
+              </li>
+        </ul>
+    </div>
+  </section>
+  </div>
+</aside>      </div>
+        <div class="joe_progress_bar"></div>
+
+  <div class="joe_action">
+      <div class="joe_action_item toc">
+        <i class="joe-font joe-icon-xiaoxi" title="文章目录"></i>
+      </div>
+      <div class="joe_action_item mode">
+        <svg class="mode-light" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="25" height="25">
+          <path d="M234.24 512a277.76 277.76 0 1 0 555.52 0 277.76 277.76 0 1 0-555.52 0zM512 187.733a42.667 42.667 0 0 1-42.667-42.666v-102.4a42.667 42.667 0 0 1 85.334 0v102.826A42.667 42.667 0 0 1 512 187.733zm-258.987 107.52a42.667 42.667 0 0 1-29.866-12.373l-72.96-73.387a42.667 42.667 0 0 1 59.306-59.306l73.387 72.96a42.667 42.667 0 0 1 0 59.733 42.667 42.667 0 0 1-29.867 12.373zm-107.52 259.414H42.667a42.667 42.667 0 0 1 0-85.334h102.826a42.667 42.667 0 0 1 0 85.334zm34.134 331.946a42.667 42.667 0 0 1-29.44-72.106l72.96-73.387a42.667 42.667 0 0 1 59.733 59.733l-73.387 73.387a42.667 42.667 0 0 1-29.866 12.373zM512 1024a42.667 42.667 0 0 1-42.667-42.667V878.507a42.667 42.667 0 0 1 85.334 0v102.826A42.667 42.667 0 0 1 512 1024zm332.373-137.387a42.667 42.667 0 0 1-29.866-12.373l-73.387-73.387a42.667 42.667 0 0 1 0-59.733 42.667 42.667 0 0 1 59.733 0l72.96 73.387a42.667 42.667 0 0 1-29.44 72.106zm136.96-331.946H878.507a42.667 42.667 0 1 1 0-85.334h102.826a42.667 42.667 0 0 1 0 85.334zM770.987 295.253a42.667 42.667 0 0 1-29.867-12.373 42.667 42.667 0 0 1 0-59.733l73.387-72.96a42.667 42.667 0 1 1 59.306 59.306l-72.96 73.387a42.667 42.667 0 0 1-29.866 12.373z"></path>
+        </svg>
+        <svg class="mode-dark active" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="25" height="25">
+          <path d="M587.264 104.96c33.28 57.856 52.224 124.928 52.224 196.608 0 218.112-176.128 394.752-393.728 394.752-29.696 0-58.368-3.584-86.528-9.728C223.744 832.512 369.152 934.4 538.624 934.4c229.376 0 414.72-186.368 414.72-416.256 1.024-212.992-159.744-389.12-366.08-413.184z"></path>
+          <path d="M340.48 567.808l-23.552-70.144-70.144-23.552 70.144-23.552 23.552-70.144 23.552 70.144 70.144 23.552-70.144 23.552-23.552 70.144zM168.96 361.472l-30.208-91.136-91.648-30.208 91.136-30.208 30.72-91.648 30.208 91.136 91.136 30.208-91.136 30.208-30.208 91.648z"></path>
+        </svg>
+      </div>
+      <div class="joe_action_item back2top">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="25" height="25">
+          <path d="M725.902 498.916c18.205-251.45-93.298-410.738-205.369-475.592l-6.257-3.982-6.258 3.414c-111.502 64.853-224.711 224.142-204.8 475.59-55.751 53.476-80.214 116.623-80.214 204.8v15.36l179.2-35.27c11.378 40.39 58.596 69.973 113.21 69.973 54.613 0 101.262-29.582 112.64-68.836l180.337 36.41v-15.36c-.569-89.885-25.031-153.6-82.489-206.507zM571.733 392.533c-33.564 31.29-87.04 28.445-118.329-5.12s-28.444-87.04 5.12-117.76c33.565-31.289 87.04-28.444 118.33 5.12s28.444 86.471-5.12 117.76zm-56.32 368.64c-35.84 0-64.284 29.014-64.284 64.285 0 35.84 54.044 182.613 64.284 182.613s64.285-146.773 64.285-182.613c0-35.271-29.014-64.285-64.285-64.285z"></path>
+        </svg>
+      </div>
+  </div>
+  <footer class="joe_footer">
+      <div class="joe_container central">
+        <div class="item">
+          <p>
+            2024 ©<a href="http://blog.shangsw.com/" target="_blank" rel="noopener noreferrer">林雷</a>
+             - <a class="icp" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer nofollow">京ICP备19045739号</a>
+          </p>
+          
+        </div>
+        <div class="side-col">
+      </div>
+      </div>
+  </footer>
+    </div>
+  <script src="./2、ReentrantLock源码解析_files/lazysizes.min.js.下载"></script>
+  <script src="./2、ReentrantLock源码解析_files/qmsg.js.下载"></script>
+    <script src="./2、ReentrantLock源码解析_files/marked.min.js.下载"></script>
+  <script src="./2、ReentrantLock源码解析_files/utils.min.js.下载"></script>
+    <script src="./2、ReentrantLock源码解析_files/tocbot.min.js.下载"></script>
+    <script src="./2、ReentrantLock源码解析_files/vue.min.js.下载"></script>
+    <script src="./2、ReentrantLock源码解析_files/halo-comment.min.js.下载"></script>
+  <script src="./2、ReentrantLock源码解析_files/jquery.fancybox.min.js.下载"></script>
+  <script src="./2、ReentrantLock源码解析_files/custom.min.js.下载"></script>
+    <script src="./2、ReentrantLock源码解析_files/clipboard.min.js.下载"></script>
+    <script src="./2、ReentrantLock源码解析_files/jquery.qrcode.min.js.下载"></script>
+
+  <script src="./2、ReentrantLock源码解析_files/common.min.js.下载"></script>
+    <script src="./2、ReentrantLock源码解析_files/prism.min.js.下载"></script>
+    <script src="./2、ReentrantLock源码解析_files/post.min.js.下载"></script>
+
+    
+  
+</body><div style="all: initial;"><div id="__hcfy__" style="all: initial;"><template shadowrootmode="open"><style>#root{-webkit-text-size-adjust:100%;box-sizing:border-box;font-size:14px;font-weight:400;letter-spacing:0;line-height:1.28581;text-transform:none;color:#182026;font-family:-apple-system,"BlinkMacSystemFont","Segoe UI","Roboto","Oxygen","Ubuntu","Cantarell","Open Sans","Helvetica Neue","Icons16",sans-serif;touch-action:manipulation}#root>.bp5-portal{z-index:9999999999}</style><link rel="stylesheet" href="chrome-extension://ikhdkkncnoglghljlkmcimlnlhkeamad/normalize.css"><link rel="stylesheet" href="chrome-extension://ikhdkkncnoglghljlkmcimlnlhkeamad/blueprint.css"><link rel="stylesheet" href="chrome-extension://ikhdkkncnoglghljlkmcimlnlhkeamad/blueprint-select.css"><link rel="stylesheet" href="chrome-extension://ikhdkkncnoglghljlkmcimlnlhkeamad/cropper.css"><style>#translate-panel{background-color:#f6f7f9;display:flex;flex-direction:column;padding-bottom:8px}.bp5-dark #translate-panel{background-color:#252a31}#translate-panel .fixed{flex-shrink:0;margin-bottom:10px}#translate-panel .body{flex-grow:1;overflow:auto;overscroll-behavior:contain}#translate-panel .body::-webkit-scrollbar{width:8px;background-color:rgba(0,0,0,0);-webkit-border-radius:100px}#translate-panel .body::-webkit-scrollbar:hover{background-color:rgba(0,0,0,.09)}#translate-panel .body::-webkit-scrollbar-thumb:vertical{background:rgba(0,0,0,.5);-webkit-border-radius:100px}#translate-panel .body::-webkit-scrollbar-thumb:vertical:active{background:rgba(0,0,0,.61);-webkit-border-radius:100px}#translate-panel.size-small,#translate-panel.size-small h6.bp5-heading,#translate-panel.size-small .bp5-control.bp5-large,#translate-panel.size-small textarea.bp5-input.bp5-small{font-size:14px}#translate-panel.size-small .phonetic-item,#translate-panel.size-small .quick-settings a{font-size:12px}#translate-panel.size-middle,#translate-panel.size-middle h6.bp5-heading,#translate-panel.size-middle .bp5-control.bp5-large,#translate-panel.size-middle textarea.bp5-input{font-size:18px}#translate-panel.size-middle .phonetic-item,#translate-panel.size-middle .quick-settings a{font-size:14px}#translate-panel.size-large,#translate-panel.size-large h6.bp5-heading,#translate-panel.size-large .bp5-control.bp5-large,#translate-panel.size-large textarea.bp5-input.bp5-large{font-size:22px}#translate-panel.size-large .source,#translate-panel.size-large .phonetic-item,#translate-panel.size-large .quick-settings a{font-size:18px}#translate-panel .bp5-button.bp5-small,#translate-panel .bp5-small .bp5-button{min-height:20px;min-width:20px}#translate-panel .header{display:flex;align-items:center;padding:4px 6px 4px 10px;border-bottom:1px solid #d1d1d1}.bp5-dark #translate-panel .header{border-bottom-color:rgba(17,20,24,.4)}#translate-panel .header .drag-block{min-width:5px;flex-shrink:0;flex-grow:1;align-self:stretch}#translate-panel .header .left{flex-shrink:0;display:flex}#translate-panel .header .right{flex-shrink:0;display:flex;align-items:center}#translate-panel .header .right .bp5-icon-arrow-right{flex-shrink:0;margin:0 5px}#translate-panel .header .right>.bp5-button{flex-shrink:0;margin:0 1px}#translate-panel .header .right>.bp5-button:last-child{margin-right:0}#translate-panel .quick-settings{padding:4px 9px;margin:0 1px}#translate-panel .quick-settings>div{margin-bottom:5px}#translate-panel .quick-settings .bp5-control{margin-bottom:0}#translate-panel .query-text{position:relative;padding:10px 10px 2px 10px}#translate-panel .query-text textarea.bp5-input{min-height:44px;font-family:system-ui,-apple-system,"Segoe UI","Roboto","Ubuntu","Cantarell","Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";overscroll-behavior:contain}#translate-panel .query-text .translate-btn{position:absolute;opacity:.6}#translate-panel .query-text .translate-btn:hover{opacity:1}#translate-panel .body{padding:0 10px}#translate-panel .body .bp5-card:first-child{margin-top:1px}#translate-panel .body .bp5-card:last-child{margin-bottom:1px}#translate-panel .body .no-api{margin:20px 0}.result-block{margin:8px 0;padding:2px 5px}.result-block .bp5-button{visibility:hidden}.result-block .error .bp5-button,.result-block:hover .bp5-button{visibility:visible}.result-block .legend{display:flex;align-items:center;justify-content:space-between}.result-block .legend .legend-left{display:flex;align-items:center}.result-block .legend .api-ico,.result-block .legend .bp5-heading{flex-shrink:0;white-space:nowrap}.result-block .legend .api-ico{display:inline-block;width:14px;height:14px;background-size:contain;margin-right:3px}.result-block .legend .bp5-heading{margin-bottom:0;margin-right:10px}.result-block .legend .source{cursor:pointer;font-size:12px;display:inline-flex;align-items:center}.result-block .legend .source .source-text{overflow:hidden}.result-block .legend .source .bp5-icon{position:relative;top:-1px;margin-left:1px}.result-block .phonetic{display:flex;flex-wrap:wrap}.result-block .phonetic .phonetic-item{display:flex;align-items:center;font-size:12px}.result-block .phonetic .phonetic-item:not(:last-child){margin-right:12px}.result-block .common-result p{line-height:1.3;margin:2px 0;overflow-wrap:break-word}.result-block .common-result .dict a{text-decoration:underline}.result-block .error{font-size:12px;padding:5px 10px}.result-block .dict-pos{margin-right:5px}.external-translators{margin-bottom:3px;padding:0;display:flex;flex-wrap:wrap}.external-translators>div{margin:0 5px 5px 0}.quick-links a{margin:0 5px 5px 0}#popper-container{width:250px;max-width:100%;position:absolute;left:0;top:0;z-index:9999999998;touch-action:none;transition:opacity .2s;background-color:#f6f7f9}.bp5-dark #popper-container{background-color:#252a31}#popper-container.show{opacity:1;pointer-events:auto;-moz-user-select:auto;user-select:auto}#popper-container,#popper-container[data-popper-reference-hidden=true]{opacity:0;pointer-events:none;-moz-user-select:none;user-select:none}#popper-container .drag-block{cursor:-webkit-grab;cursor:grab}#popper-container.pin{position:fixed}#popper-container.pin .arrow{display:none}#popper-container .arrow,#popper-container .arrow::before{position:absolute;width:8px;height:8px;z-index:-1}#popper-container .arrow::before{content:"";transform:rotate(45deg);background:#f6f7f9}.bp5-dark #popper-container .arrow::before{background-color:#252a31}#popper-container .arrow{display:none}#popper-container.show[data-popper-placement]:not([data-popper-reference-hidden=true]) .arrow{display:block}#popper-container[data-popper-placement^=top] .arrow{bottom:-5px}#popper-container[data-popper-placement^=top] .arrow::before{border-right:1px solid #d1d1d1;border-bottom:1px solid #d1d1d1}#popper-container[data-popper-placement^=bottom] .arrow{top:-5px}#popper-container[data-popper-placement^=bottom] .arrow::before{border-left:1px solid #d1d1d1;border-top:1px solid #d1d1d1}#popper-container[data-popper-placement^=left] .arrow{right:-5px}#popper-container[data-popper-placement^=left] .arrow::before{border-right:1px solid #d1d1d1;border-top:1px solid #d1d1d1}#popper-container[data-popper-placement^=right] .arrow{left:-5px}#popper-container[data-popper-placement^=right] .arrow::before{border-left:1px solid #d1d1d1;border-bottom:1px solid #d1d1d1}#translate-btn{display:none;position:absolute;z-index:9999999999;left:0;top:0}#translate-btn .bp5-button{padding:2px;min-width:0;min-height:0}#translate-btn .btn-icon{width:18px;height:18px;background-image:url(chrome-extension://ikhdkkncnoglghljlkmcimlnlhkeamad/logo.png);background-size:contain}.bp5-dark #translate-btn .btn-icon{background-image:url(chrome-extension://ikhdkkncnoglghljlkmcimlnlhkeamad/logowhite36.png)}#translate-btn.show{display:block}.translate-type-selector .bp5-label{display:inline}.translate-type-selector .bp5-radio{margin-bottom:0}#ocr-container{position:fixed;z-index:99999999999999;left:0;top:0;right:0;bottom:0}#ocr-container .toolbar{display:none;position:absolute;z-index:1}#ocr-container img{max-width:100%}#app{cursor:default}.switch-pin{flex-shrink:0;cursor:pointer}.switch-pin .bp5-icon-pin{transition:transform .2s,color .2s;transform:rotate(-45deg)}.pin .switch-pin .bp5-icon-pin{transform:rotate(-70deg)}.cut-btn{margin-left:2px}.app-toaster-container{position:fixed !important;z-index:9999999999 !important}.app-toaster-container .bp5-toast{min-width:auto}#web-trs-panel .app-toaster-container{padding-right:0;padding-left:0}#web-trs-panel .page-trs-form-group{margin:0 0 0 0;align-items:center}#web-trs-panel .page-trs-form-group>label{width:70px}</style><div id="root" dir="ltr"><div id="app"><div id="translate-btn"><button type="button" class="bp5-button"><span class="btn-icon"></span></button></div><div id="popper-container" class="bp5-elevation-4" style="width: 1013.56px; transform: translate(0px, 0px);"><div id="translate-panel" class="size-small"><div class="fixed"><div class="header"><div class="left"><div class="switch-pin"><button type="button" class="bp5-button bp5-minimal bp5-small"><span aria-hidden="true" class="bp5-icon bp5-icon-pin"><svg data-icon="pin" height="14" role="img" viewBox="0 0 16 16" width="14"><path d="M9.41.92c-.51.51-.41 1.5.15 2.56L4.34 7.54C2.8 6.48 1.45 6.05.92 6.58l3.54 3.54-3.54 4.95 4.95-3.54 3.54 3.54c.53-.53.1-1.88-.96-3.42l4.06-5.22c1.06.56 2.04.66 2.55.15L9.41.92z" fill-rule="evenodd"></path></svg></span></button></div><button type="button" title="图片翻译" class="bp5-button bp5-minimal bp5-small"><span aria-hidden="true" class="bp5-icon bp5-icon-media"><svg data-icon="media" height="14" role="img" viewBox="0 0 16 16" width="14"><path d="M11.99 6.99c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1zm3-5h-14c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h14c.55 0 1-.45 1-1v-10c0-.55-.45-1-1-1zm-1 9l-5-3-1 2-3-4-3 5v-7h12v7z" fill-rule="evenodd"></path></svg></span></button><button type="button" title="语音翻译" class="bp5-button bp5-minimal bp5-small"><span class="bp5-icon"><svg version="1.1" id="Capa_1" width="14" height="14" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 490.9 490.9" xml:space="preserve"><g><g><path d="M245.5,322.9c53,0,96.2-43.2,96.2-96.2V96.2c0-53-43.2-96.2-96.2-96.2s-96.2,43.2-96.2,96.2v130.5 C149.3,279.8,192.5,322.9,245.5,322.9z M173.8,96.2c0-39.5,32.2-71.7,71.7-71.7s71.7,32.2,71.7,71.7v130.5 c0,39.5-32.2,71.7-71.7,71.7s-71.7-32.2-71.7-71.7V96.2z"></path><path d="M94.4,214.5c-6.8,0-12.3,5.5-12.3,12.3c0,85.9,66.7,156.6,151.1,162.8v76.7h-63.9c-6.8,0-12.3,5.5-12.3,12.3 s5.5,12.3,12.3,12.3h152.3c6.8,0,12.3-5.5,12.3-12.3s-5.5-12.3-12.3-12.3h-63.9v-76.7c84.4-6.3,151.1-76.9,151.1-162.8 c0-6.8-5.5-12.3-12.3-12.3s-12.3,5.5-12.3,12.3c0,76.6-62.3,138.9-138.9,138.9s-138.9-62.3-138.9-138.9 C106.6,220,101.2,214.5,94.4,214.5z"></path></g></g></svg></span></button></div><div class="drag-block" title="按住不放可以拖动"></div><div class="right"><div style="font-size: 0px; position: relative;"><button type="button" title="你有 2 条未读消息" class="bp5-button bp5-minimal bp5-small"><span aria-hidden="true" class="bp5-icon bp5-icon-notifications"><svg data-icon="notifications" height="14" role="img" viewBox="0 0 16 16" width="14"><path d="M8 16c1.1 0 2-.9 2-2H6c0 1.1.9 2 2 2zm6-5c-.55 0-1-.45-1-1V6c0-2.43-1.73-4.45-4.02-4.9 0-.04.02-.06.02-.1 0-.55-.45-1-1-1S7 .45 7 1c0 .04.02.06.02.1A4.992 4.992 0 003 6v4c0 .55-.45 1-1 1s-1 .45-1 1 .45 1 1 1h12c.55 0 1-.45 1-1s-.45-1-1-1z" fill-rule="evenodd"></path></svg></span></button><div style="position: absolute; background: rgb(243, 1, 1); width: 6px; height: 6px; border-radius: 3px; right: 3px; top: 1px;"></div></div><button type="button" disabled="" title="添加到收藏夹" class="bp5-button bp5-disabled bp5-minimal bp5-small" tabindex="-1"><span aria-hidden="true" class="bp5-icon bp5-icon-star-empty"><svg data-icon="star-empty" height="14" role="img" viewBox="0 0 16 16" width="14"><path d="M16 6.11l-5.53-.84L8 0 5.53 5.27 0 6.11l4 4.1L3.06 16 8 13.27 12.94 16 12 10.21l4-4.1zM4.91 13.2l.59-3.62L3 7.02l3.45-.53L8 3.2l1.55 3.29 3.45.53-2.5 2.56.59 3.62L8 11.49 4.91 13.2z" fill-rule="evenodd"></path></svg></span></button><button type="button" class="bp5-button bp5-minimal bp5-small settings" title="快捷设置"><span aria-hidden="true" class="bp5-icon bp5-icon-cog"><svg data-icon="cog" height="14" role="img" viewBox="0 0 16 16" width="14"><path d="M15.19 6.39h-1.85c-.11-.37-.27-.71-.45-1.04l1.36-1.36c.31-.31.31-.82 0-1.13l-1.13-1.13a.803.803 0 00-1.13 0l-1.36 1.36c-.33-.17-.67-.33-1.04-.44V.79c0-.44-.36-.8-.8-.8h-1.6c-.44 0-.8.36-.8.8v1.86c-.39.12-.75.28-1.1.47l-1.3-1.3c-.3-.3-.79-.3-1.09 0L1.82 2.91c-.3.3-.3.79 0 1.09l1.3 1.3c-.2.34-.36.7-.48 1.09H.79c-.44 0-.8.36-.8.8v1.6c0 .44.36.8.8.8h1.85c.11.37.27.71.45 1.04l-1.36 1.36c-.31.31-.31.82 0 1.13l1.13 1.13c.31.31.82.31 1.13 0l1.36-1.36c.33.18.67.33 1.04.44v1.86c0 .44.36.8.8.8h1.6c.44 0 .8-.36.8-.8v-1.86c.39-.12.75-.28 1.1-.47l1.3 1.3c.3.3.79.3 1.09 0l1.09-1.09c.3-.3.3-.79 0-1.09l-1.3-1.3c.19-.35.36-.71.48-1.1h1.85c.44 0 .8-.36.8-.8v-1.6a.816.816 0 00-.81-.79zm-7.2 4.6c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z" fill-rule="evenodd"></path></svg></span></button><button type="button" title="关闭(Esc)" class="bp5-button bp5-minimal bp5-small"><span aria-hidden="true" class="bp5-icon bp5-icon-cross"><svg data-icon="cross" height="18" role="img" viewBox="0 0 16 16" width="18"><path d="M9.41 8l3.29-3.29c.19-.18.3-.43.3-.71a1.003 1.003 0 00-1.71-.71L8 6.59l-3.29-3.3a1.003 1.003 0 00-1.42 1.42L6.59 8 3.3 11.29c-.19.18-.3.43-.3.71a1.003 1.003 0 001.71.71L8 9.41l3.29 3.29c.18.19.43.3.71.3a1.003 1.003 0 00.71-1.71L9.41 8z" fill-rule="evenodd"></path></svg></span></button></div></div><div class="bp5-collapse"><div class="bp5-collapse-body" aria-hidden="true"><div class="quick-settings bp5-card bp5-elevation-0"><div><span aria-controls="listbox-0" aria-expanded="false" aria-haspopup="listbox" class="lang-select bp5-popover-target" role="combobox"><button type="button" class="bp5-button bp5-small"><span class="bp5-button-text">自动检测</span><span aria-hidden="true" class="bp5-icon bp5-icon-caret-down"><svg data-icon="caret-down" height="16" role="img" viewBox="0 0 16 16" width="16"><path d="M12 6.5c0-.28-.22-.5-.5-.5h-7a.495.495 0 00-.37.83l3.5 4c.09.1.22.17.37.17s.28-.07.37-.17l3.5-4c.08-.09.13-.2.13-.33z" fill-rule="evenodd"></path></svg></span></button></span><span aria-hidden="true" class="bp5-icon bp5-icon-arrow-right" style="margin: 0px 10px;"><svg data-icon="arrow-right" height="12" role="img" viewBox="0 0 16 16" width="12"><path d="M14.7 7.29l-5-5a.965.965 0 00-.71-.3 1.003 1.003 0 00-.71 1.71l3.29 3.29H1.99c-.55 0-1 .45-1 1s.45 1 1 1h9.59l-3.29 3.29a1.003 1.003 0 001.42 1.42l5-5c.18-.18.29-.43.29-.71s-.12-.52-.3-.7z" fill-rule="evenodd"></path></svg></span><span aria-controls="listbox-1" aria-expanded="false" aria-haspopup="listbox" class="lang-select bp5-popover-target" role="combobox"><button type="button" class="bp5-button bp5-small"><span class="bp5-button-text">中文(简体)</span><span aria-hidden="true" class="bp5-icon bp5-icon-caret-down"><svg data-icon="caret-down" height="16" role="img" viewBox="0 0 16 16" width="16"><path d="M12 6.5c0-.28-.22-.5-.5-.5h-7a.495.495 0 00-.37.83l3.5 4c.09.1.22.17.37.17s.28-.07.37-.17l3.5-4c.08-.09.13-.2.13-.33z" fill-rule="evenodd"></path></svg></span></button></span></div><div><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox" checked=""><span class="bp5-control-indicator"></span>谷歌</label><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox" checked=""><span class="bp5-control-indicator"></span>DeepL</label><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox"><span class="bp5-control-indicator"></span>ChatGPT</label><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox"><span class="bp5-control-indicator"></span>Yandex</label><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox"><span class="bp5-control-indicator"></span>百度</label><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox"><span class="bp5-control-indicator"></span>百度(专业版)</label><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox"><span class="bp5-control-indicator"></span>腾讯</label><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox"><span class="bp5-control-indicator"></span>彩云</label><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox"><span class="bp5-control-indicator"></span>阿里</label><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox"><span class="bp5-control-indicator"></span>阿里(专业版)</label><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox"><span class="bp5-control-indicator"></span>有道</label><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox"><span class="bp5-control-indicator"></span>火山</label><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox"><span class="bp5-control-indicator"></span>必应词典</label><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox"><span class="bp5-control-indicator"></span>搜狗</label></div><div><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox"><span class="bp5-control-indicator"></span>自动朗读</label><span aria-expanded="false" aria-haspopup="true" class="bp5-popover-target"><label class="bp5-control bp5-checkbox bp5-disabled bp5-inline"><input disabled="" tabindex="0" type="checkbox"><span class="bp5-control-indicator"></span>自动复制</label></span></div><div class="bp5-radio-group"><label class="bp5-control bp5-radio bp5-inline"><input name="Blueprint5.RadioGroup-0" type="radio" value="small" checked=""><span class="bp5-control-indicator"></span>小</label><label class="bp5-control bp5-radio bp5-inline"><input name="Blueprint5.RadioGroup-0" type="radio" value="middle"><span class="bp5-control-indicator"></span>中</label><label class="bp5-control bp5-radio bp5-inline"><input name="Blueprint5.RadioGroup-0" type="radio" value="large"><span class="bp5-control-indicator"></span>大</label></div><div><label class="bp5-control bp5-checkbox bp5-inline"><input type="checkbox"><span class="bp5-control-indicator"></span>显示文本框</label><label class="bp5-control bp5-checkbox bp5-inline" style="margin-right: 0px;"><input type="checkbox"><span class="bp5-control-indicator"></span>鼠标悬浮取词</label></div><a class="bp5-text-small">打开完整设置</a><a class="bp5-text-small" style="margin-left: 15px;"><span aria-hidden="true" class="bp5-icon bp5-icon-crown" style="position: relative; top: -1px;"><svg data-icon="crown" height="14" role="img" viewBox="0 0 16 16" width="14"><path d="M2 6l3 2 3-4 3 4 3-2-1 6H3L2 6zm6-5a1 1 0 110 2 1 1 0 010-2zM1 3a1 1 0 110 2 1 1 0 010-2zm14 0a1 1 0 110 2 1 1 0 010-2zM3 13h10v2H3v-2z" fill-rule="evenodd"></path></svg></span> 开通会员</a></div></div></div></div><div class="body"><p>请输入需要翻译的文本。</p></div></div><div class="arrow"></div></div><div id="web-trs-panel"></div></div></div></template></div></div></html>
