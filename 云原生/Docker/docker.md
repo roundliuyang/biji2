@@ -241,3 +241,84 @@ docker service logs -f --tail 200 yxg8ytas0c6c
 
 
 
+
+
+
+
+## 镜像加速
+
+>aliyun指南:https://cr.console.aliyun.com/cn-qingdao/instances/mirrors
+
+1、调整镜像源
+
+```shell
+vi /etc/docker/daemon.json
+```
+
+配如下地址
+
+```shell
+{
+	"registry-mirrors": [
+		"https://2a6bf1988cb6428c877f723ec7530dbc.mirror.swr.myhuaweicloud.com",
+		"https://docker.m.daocloud.io",
+		"https://hub-mirror.c.163.com",
+		"https://mirror.baidubce.com",
+		"https://your_preferred_mirror",
+		"https://dockerhub.icu",
+		"https://docker.registry.cyou",
+		"https://docker-cf.registry.cyou",
+		"https://dockercf.jsdelivr.fyi",
+		"https://docker.jsdelivr.fyi",
+		"https://dockertest.jsdelivr.fyi",
+		"https://mirror.aliyuncs.com",
+		"https://dockerproxy.com",
+		"https://mirror.baidubce.com",
+		"https://docker.m.daocloud.io",
+		"https://docker.nju.edu.cn",
+		"https://docker.mirrors.sjtug.sjtu.edu.cn",
+		"https://docker.mirrors.ustc.edu.cn",
+		"https://mirror.iscas.ac.cn",
+		"https://docker.rainbond.cc"
+	]
+}
+```
+
+
+
+2、重新加载配置文件及docker服务
+
+```shell
+systemctl daemon-reload
+systemctl restart docker
+```
+
+
+
+
+
+## 日常使用
+
+
+
+### 粘贴
+
+在 Vim 中粘贴 JSON 内容时，尤其是从剪贴板或其他地方复制的大段内容，为了避免自动缩进和格式错乱，建议使用以下步骤之一：
+
+
+
+###  方法一：使用 “粘贴模式” (`paste` 模式，推荐)
+
+在 Vim 中输入命令模式：
+
+```
+:set paste
+```
+
+然后进入插入模式（`i` 或 `a`），粘贴你复制好的 JSON 内容（右键或 Ctrl+Shift+V）。
+
+粘贴完成后，记得关闭粘贴模式（恢复正常缩进）：
+
+```
+:set nopaste
+```

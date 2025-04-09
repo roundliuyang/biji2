@@ -2,19 +2,17 @@
 
 
 
-## 1. Overview
+## 1. 概述
+
+在本教程中，我们将讨论 Java 中的接口。我们还将了解 Java 如何使用它们来实现多态性和多重继承。
 
 
 
-In this tutorial, we're going to talk about interfaces in Java. We'll also see how Java uses them to implement polymorphism and multiple inheritances.
+## 2. Java 中的接口是什么？
 
+在 Java 中，接口是一种抽象类型，它包含一组方法和常量变量。接口是 Java 的核心概念之一，用于实现抽象、多态和多重继承。
 
-
-## 2. What Are Interfaces in Java?
-
-In Java, an interface is an abstract type that contains a collection of methods and constant variables. It is one of the core concepts in Java and is **used to achieve abstraction, polymorphism and multiple inheritances**.
-
-Let's see a simple example of an interface in Java:
+我们来看一个 Java 中接口的简单例子：
 
 ```java
 public interface Electronic {
@@ -41,9 +39,9 @@ public interface Electronic {
 
 ```
 
-We can implement an interface in a Java class by using the *implements* keyword.
+我们可以通过使用 `implements` 关键字在 Java 类中实现一个接口。
 
-Next, let's also create a *Computer* class that implements the *Electronic* interface we just created:
+接下来，让我们创建一个 `Computer` 类来实现我们刚刚创建的 `Electronic` 接口：
 
 ```java
 public class Computer implements Electronic {
@@ -60,26 +58,24 @@ public class Computer implements Electronic {
 
 
 
-### 2.1. Rules for Creating Interfaces
+### 2.1. 创建接口的规则
 
-In an interface, we're allowed to use:
+在接口中，我们可以使用：
 
-- [constants variables](https://www.baeldung.com/java-final)
-- [abstract methods](https://www.baeldung.com/java-abstract-class)
-- [static methods](https://www.baeldung.com/java-static-default-methods)
-- [default methods](https://www.baeldung.com/java-static-default-methods)
+- 常量变量
+- 抽象方法
+- 静态方法
+- 默认方法
 
-We also should remember that:
+我们还应该记住：
 
-- we can't instantiate interfaces directly
-- an interface can be empty, with no methods or variables in it
-- we can't use the *final* word in the interface definition, as it will result in a compiler error
-- all interface declarations should have the *public* or default access modifier; the *abstract* modifier will be added automatically by the compiler
-- an interface method can't be *protected* or *final*
-- up until Java 9, interface methods could not be *private*; however, Java 9 introduced the possibility to define [private methods in interfaces](https://www.baeldung.com/java-interface-private-methods)
-- interface variables are *public*, *static*, and *final* by definition; we're not allowed to change their visibility
-
-
+- 我们不能直接实例化接口
+- 接口可以是空的，即没有任何方法或变量
+- 接口定义中不能使用 `final` 关键字，否则会导致编译错误
+- 所有接口声明应使用 `public` 或默认访问修饰符；`abstract` 修饰符会由编译器自动添加
+- 接口中的方法不能是 `protected` 或 `final`
+- 在 Java 9 之前，接口方法不能是 `private`；但从 Java 9 开始，接口中可以定义私有方法
+- 接口中的变量默认是 `public`、`static` 和 `final`；我们不能更改它们的可见性
 
 
 
