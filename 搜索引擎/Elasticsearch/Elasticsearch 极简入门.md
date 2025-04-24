@@ -6,77 +6,73 @@
 
 **前置准备**：
 
-1、安装 JDK 。
+1. 安装 JDK 。
 
-2、修改 `/etc/security/limits.conf` ，在此配置中增加以下内容。
+2. 修改 `/etc/security/limits.conf` ，在此配置中增加以下内容。
 
-> 如果服务器已经配置好，可以不用重复配置。需要在 Root 下执行。
+   >如果服务器已经配置好，可以不用重复配置。需要在 Root 下执行。
 
+   ```
+   root soft nofile 65535
+   root hard nofile 65535
+   * soft nofile 65535
+   * hard nofile 65535
+   ```
 
+   - 修改完成后同时使用命令修改配置：
 
-```
-root soft nofile 65535
-root hard nofile 65535
-* soft nofile 65535
-* hard nofile 65535
-```
+     ```
+     $ ulimit -n 65536
+     $ ulimit -n
+     65536
+     ```
 
+   - 这些配置主要为文件系统描述符及相关的配置，具体的配置可以根据自己的系统配置调大或调小。
 
+3. 修改 `/etc/sysctl.conf` ，增加如下内容：
 
-- 修改完成后同时使用命令修改配置：
+   ```
+   vm.max_map_count=655360
+   ```
 
-  ```
-  $ ulimit -n 65536
-  $ ulimit -n
-  65536
-  ```
-
-  
-
-- 这些配置主要为文件系统描述符及相关的配置，具体的配置可以根据自己的系统配置调大或调小。
-
-3、修改 `/etc/sysctl.conf` ，增加如下内容：
-
-> 如果服务器已经配置好，可以不用重复配置。需要在 Root 下执行。
+   修改完成后，执行 `sysctl -p` 命令，使配置生效。
 
 
-
-```
-vm.max_map_count=655360
-```
-
-
-
-- 修改完成后，执行 `sysctl -p` 命令，使配置生效。
 
 **下载**：
 
-
-
-```shell
+```bash
 # 创建目录
 $ mkdir -p /work/programs/elasticsearch
 $ cd /work/programs/elasticsearch
 
 # 下载
 $ wget https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-6.7.2.tar.gz
+
+#7.5.1 版本
+https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.5.1-linux-x86_64.tar.gz
 ```
 
 
 
 **编辑配置**：
 
-
-
+```bash
+$ vim config/elasticsearch.yml
 ```
-$ vi config/elasticsearch.yml
-```
-
-
 
 修改配置项如下：
 
 - `network.host: 0.0.0.0` ：实现内网可访问。
+
+  ```bash
+  #主机名，通过 hostname 命令查询到
+  cluster.initial_master_nodes: ["主机名"]    // 7.5.1 版本需要加这个，其它的配置目前不用
+  network.host: 0.0.0.0
+  http.port: 9200
+  http.cors.enabled: true
+  http.cors.allow-origin: "*"
+  ```
 
 注意，如果你安装的 Elasticsearch 是 8.X 版本，需要关闭 security 安全相关的功能。如下图所示：
 
@@ -86,9 +82,7 @@ $ vi config/elasticsearch.yml
 
 > 注意，需要使用非 Root 账号启动。
 
-
-
-```
+```bash
 # 解压
 $ tar -zxvf elasticsearch-6.7.2.tar.gz
 $ cd elasticsearch-6.7.2
@@ -104,8 +98,6 @@ $ bin/elasticsearch -d
 **测试**：
 
 访问 `http://服务器 IP:9200` 后，成功返回如下 JSON 串，表示成功。
-
-
 
 ```
 {
@@ -139,24 +131,21 @@ $ bin/elasticsearch -d
 
 在 <https://github.com/medcl/elasticsearch-analysis-ik/releases> 中，提供了各个 elasticsearch-analysis-ik 插件版本。要注意，一定和 Elasticsearch 版本一致。例如说，艿艿 Elasticsearch 版本是 6.5.0 ，所以需要使用 [elasticsearch-analysis-ik-v6.5.0](https://github.com/medcl/elasticsearch-analysis-ik/releases/tag/v6.5.0) 。
 
-
-
-```
+```bash
 # 先告诉你，艿艿目前所在目录
 $ pwd
-/Users/yunai/ES/6.5.0
+/work/programs/elasticsearch/6.5.0
 
 # 下载
 $ wget https://github.com/medcl/elasticsearch-analysis-ik/releases/download/v6.5.0/elasticsearch-analysis-ik-6.5.0.zip
+# 7.5.1 版本可以网上找或者自己网盘里有
 ```
 
 
 
 **解压：**
 
-
-
-```
+```bash
 # 需要解压到 plugins/ik/ 目录下
 $ unzip elasticsearch-analysis-ik-6.5.0.zip -d plugins/ik/
 ```
@@ -165,9 +154,7 @@ $ unzip elasticsearch-analysis-ik-6.5.0.zip -d plugins/ik/
 
 **重启：**
 
-
-
-```
+```bash
 # 查找 ES 进程，并关闭它
 $ ps -ef | grep elastic
 $ kill 2382 # 假设我们找到的 ES 进程号为 2382 。
@@ -186,8 +173,6 @@ IK 分词器提供了 2 种分词模式：
 - ik_smart ：IK 智能分词，会做最**粗**粒度的拆分。
 
 我们将 `"百事可乐"` 进行分词，看看他们之间的差异。
-
-
 
 ```
 # ik_max_word 模式
@@ -210,8 +195,6 @@ $ curl -X POST \
 }'
 {"tokens":[{"token":"百事可乐","start_offset":0,"end_offset":4,"type":"CN_WORD","position":0}]}
 ```
-
-
 
 - 很明显，ik_max_word 比 ik_smart 分出了更多的词。
 

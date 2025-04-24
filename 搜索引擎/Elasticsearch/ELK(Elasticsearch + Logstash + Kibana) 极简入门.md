@@ -1,9 +1,5 @@
 # ELK(Elasticsearch + Logstash + Kibana) 极简入门
 
-
-
-
-
 ## 1. 概述
 
 在线上问题排查时，通过日志来定位是经常使用的手段之一，甚至是最有效的。
@@ -18,13 +14,13 @@
 - 4、查询 ：能够灵活且高效的查询日志数据，并提供一定的分析能力。
 - 5、告警 ：能够提供提供告警功能，通知开发和运维等等。
 
+
+
 ### 1.1 解决方案
 
 目前，市面上有非常多的日志服务的解决方案。例如说：
 
-- 开源
-
-  解决方案
+- 开源解决方案
 
   - [ELK](https://www.elastic.co/what-is/elk-stack)
   - [Apache Chukwa](http://chukwa.apache.org/)
@@ -32,17 +28,17 @@
   - [Cloudera Fluentd](https://github.com/fluent/fluentd)
   - [Syslog](https://en.wikipedia.org/wiki/Syslog)、[Rsyslog](https://www.rsyslog.com/)、[Syslog-ng](https://www.syslog-ng.com/)
   - [Facebook Scribe](https://github.com/facebookarchive/scribe)
-
-- 商业
-
-  解决方案
+  
+- 商业解决方案
 
   - [阿里云 SLS](https://cn.aliyun.com/product/sls)、[腾讯云 CLS](https://cloud.tencent.com/product/cls)、[华为云 LTS](https://www.huaweicloud.com/product/lts.html)
-  - [Splunk](https://www.splunk.com/zh-hans_cn)
+- [Splunk](https://www.splunk.com/zh-hans_cn)
 
 我们目前线上采用阿里云 SLS 日志服务，主要考虑使用方便，成本合算。阿里云**打钱**~
 
 目前采用最多的日志服务的解决方案，是 ELK 搭建的日志服务。😈 艿艿也问了一圈身边的胖友，验证无误。
+
+
 
 ### 1.2 ELK
 
@@ -56,9 +52,13 @@
 > - Logstash 是服务器端数据处理管道，能够同时从多个来源采集数据，转换数据，然后将数据发送到诸如 Elasticsearch 等“存储库”中。
 > - Kibana 则可以让用户在 Elasticsearch 中使用图形和图表对数据进行可视化。
 
-即整体架构，如下图所示：![ELK 最简架构](ELK(Elasticsearch + Logstash + Kibana) 极简入门.assets/01.png)
+即整体架构，如下图所示：
+
+![ELK 最简架构](ELK(Elasticsearch + Logstash + Kibana) 极简入门.assets/01.png)
 
 下面，我们就来使用 ELK 搭建一个日志服务。
+
+
 
 ## 2. Elasticsearch 搭建
 
@@ -70,19 +70,21 @@
 
 不过要**注意**，本文使用的是 Elasticsearch `7.5.1` 版本。
 
+
+
 ## 3. Logstash 搭建
 
 > FROM <https://www.elastic.co/cn/products/logstash>
 >
 > Logstash 是开源的服务器端数据处理管道，能够同时从多个来源采集数据，转换数据，然后将数据发送到您最喜欢的“存储库”中。
 
+
+
 ### 3.1 下载
 
 打开 [Logstash 下载页面](https://www.elastic.co/cn/downloads/logstash)，选择想要的 Logstash 版本。这里，我们选择 `7.5.1` 最新版本。
 
-
-
-```
+```bash
 # 创建目录
 $ mkdir -p /Users/yunai/Logstash
 $ cd /Users/yunai/Logstash
@@ -119,9 +121,7 @@ $ ls- ls
 
 在 `config` 目录下，提供了 Logstash 的配置文件。我们来看看：
 
-
-
-```
+```bash
 # 查看 config 目录
 $ ls -ls config/
  8 -rwxr-xr-x@ 1 yunai  staff  2019 Dec 17 00:54 jvm.options
@@ -135,8 +135,6 @@ $ ls -ls config/
 
 
 其中，`logstash-sample.conf` 配置文件，是 Logstash 提供的 Pipeline 配置的示例。我们再来看看：
-
-
 
 ```
 $ cat config/logstash-sample.conf
@@ -160,9 +158,9 @@ output {
 }
 ```
 
+在 Logstash 中，我们通过定义了一个 Logstash 管道（Logstash Pipeline），来读取、过滤、输出数据。一个 Logstash Pipeline 包含**三部分**，如下图所示：
 
-
-在 Logstash 中，我们通过定义了一个 Logstash 管道（Logstash Pipeline），来读取、过滤、输出数据。一个 Logstash Pipeline 包含**三部分**，如下图所示：![Logstash Pipeline](ELK(Elasticsearch + Logstash + Kibana) 极简入门.assets/9df53588c96658d66d2d286f8fa272e0)
+![Logstash Pipeline](ELK(Elasticsearch + Logstash + Kibana) 极简入门.assets/9df53588c96658d66d2d286f8fa272e0)
 
 - 【必选】输入（Input） 数据（包含但不限于日志）往往都是以不同的形式、格式存储在不同的系统中，而 Logstash 支持从多种数据源中收集数据（File、Syslog、MySQL、消息中间件等等）。
 - 【可选】过滤器（Filter） ：实时解析和转换数据，识别已命名的字段以构建结构，并将它们转换成通用格式。
@@ -175,9 +173,13 @@ output {
 
 在采集日志数据时，我们需要在服务器上安装一个 Logstash。不过 Logstash 是基于 JVM 的**重量级**的采集器，对系统的 CPU、内存、IO 等等资源占用非常高，这样可能影响服务器上的其它服务的运行。所以，[Elastic NV](https://en.wikipedia.org/wiki/Elastic_NV) 推出 Beats ，基于 Go 的**轻量级**采集器，对系统的 CPU、内存、IO 等等资源的占用基本可以忽略不计。
 
-因此，本文的示例就变成了 ELFK 。其中，Beats 负责**采集**数据，并通过**网路传输**给 Logstash。即整体架构，如下图所示：![ELFK 最简架构](ELK(Elasticsearch + Logstash + Kibana) 极简入门.assets/03.png)
+因此，本文的示例就变成了 ELFK 。其中，Beats 负责**采集**数据，并通过**网路传输**给 Logstash。即整体架构，如下图所示：
+
+![ELFK 最简架构](ELK(Elasticsearch + Logstash + Kibana) 极简入门.assets/03.png)
 
 更多关于 Beats 的内容，我们会在[「4. Beats 搭建」](https://www.iocoder.cn/Elasticsearch/ELK-install/?self#)看到。
+
+
 
 ### 3.3 启动
 
@@ -185,9 +187,7 @@ output {
 
 可以通过 `nohup.out` 日志，查看启动是否成功。日志内容如下：
 
-
-
-```
+```bash
 # 注释：Beats 5044 端口
 [2020-01-01T10:12:04,262][INFO ][logstash.inputs.beats    ][main] Beats inputs: Starting input listener {:address=>"0.0.0.0:5044"}
 [2020-01-01T10:12:04,271][INFO ][logstash.javapipeline    ][main] Pipeline started {"pipeline.id"=>"main"}
@@ -205,6 +205,8 @@ output {
 > FROM <https://www.elastic.co/cn/products/beats>
 >
 > 轻量型数据采集器 ：Beats 平台集合了多种单一用途数据采集器。它们从成百上千或成千上万台机器和系统向 Logstash 或 Elasticsearch 发送数据。
+>
+> 注意：wsl 在安装7.5.1的时候会报错，可以直接部署在windows中，output指向wsl中的logstash。
 
 在 Beats 发布之后，[Elastic NV](https://en.wikipedia.org/wiki/Elastic_NV) 重新定义 ELK ，**升级**成 **Elastic Stack**。如下图：![Elastic Stack](ELK(Elasticsearch + Logstash + Kibana) 极简入门.assets/04.png)
 
@@ -222,13 +224,13 @@ Beats 是一个全品类采集器的**系列**，包含多个：
 
 具体采集的日志文件，胖友可以先从 <https://static.iocoder.cn/spring.log> 下载，艿艿预先生成好了一个 Spring Boot 启动时打印的日志文件。
 
+
+
 ### 4.1 下载
 
 打开 [Filebeat 下载页面](https://www.elastic.co/cn/downloads/beats/filebeat)，选择想要的 Filebeat 版本。这里，我们选择 `7.5.1` 最新版本。
 
-
-
-```
+```bash
 # 创建目录
 $ mkdir -p /Users/yunai/Filebeat
 $ cd /Users/yunai/Filebeat
@@ -258,11 +260,9 @@ $ ls- ls
 
 ### 4.2 配置文件
 
-使用 `vi filebeat.yml` 命令，编辑 Filebeat 配置文件。主要修改如下行：
+使用 `vim filebeat.yml` 命令，编辑 Filebeat 配置文件。主要修改如下行：
 
-
-
-```
+```bash
 #=========================== Filebeat inputs =============================
 filebeat.inputs:
 - type: log
@@ -288,63 +288,16 @@ output.logstash:
 
 
 
-- ```
-  filebeat.inputs
-  ```
-
-   
-
-  配置项，设置 Filebeat 读取的日志来源。该配置项是
-
-  数组
-
-  类型，可以将 Nginx、MySQL、Spring Boot
-
-   
-
-  每一类
-
-  ，作为数组中的一个元素。
-
+- `filebeat.inputs`配置项，设置 Filebeat 读取的日志来源。该配置项是数组类型，可以将 Nginx、MySQL、Spring Boot 每一类，作为数组中的一个元素。
   - 这里，我们配置读取一个 Spring Boot 应用的日志。
-
-- ```
-  output.elasticsearch
-  ```
-
-   
-
-  配置项，设置 Filebeat 直接写入数据到 Elasticsearch 中。虽然说 Filebeat
-
-   
-
-  ```
-  5.0
-  ```
-
-   
-
-  版本以来，也提供了
-
-   
-
-  Filter
-
-   
-
-  功能，但是相比 Logstash 提供的 Filter 会弱一些。所以在一般情况下，Filebeat 并不直接写入到 Elasticsearch 中。
-
+  
+- `output.elasticsearch`配置项，设置 Filebeat 直接写入数据到 Elasticsearch 中。虽然说 Filebeat5.0版本以来，也提供了Filter 功能，但是相比 Logstash 提供的 Filter 会弱一些。所以在一般情况下，Filebeat 并不直接写入到 Elasticsearch 中。
   - 这里，我们注释掉该配置项，设置 Filebeat 不写入到 Elasticsearch 中。
-
-- ```
-  output.logstash
-  ```
-
-   
-
-  配置项，设置 Filebeat 写入数据到 Logstash 中。
-
+  
+- `output.logstash`配置项，设置 Filebeat 写入数据到 Logstash 中。
   - 这里，我们配置写入到[「3. Logstash 搭建」](https://www.iocoder.cn/Elasticsearch/ELK-install/?self#)中。
+
+
 
 ### 4.3 启动
 
@@ -352,9 +305,7 @@ output.logstash:
 
 可以通过 `logs/filebeat` 日志，查看启动是否成功。如果没有 `ERROR` 级别的日志，说明启动成功。下面是艿艿截取的部分日志：
 
-
-
-```
+```bash
 # 加载成功一个 input
 2020-01-01T16:03:03.686+0800    INFO    crawler/crawler.go:72   Loading Inputs: 1
 2020-01-01T16:03:03.687+0800    INFO    log/input.go:152        Configured paths: [/Users/yunai/logs/spring.log]
@@ -366,21 +317,17 @@ output.logstash:
 2020-01-01T16:03:03.687+0800    INFO    cfgfile/reload.go:226   Loading of config files completed.
 ```
 
-
-
 可以通过 `data/registry/filebeat/data.json` 数据，查看每个日文件的采集进度。例如说：
-
-
 
 ```
 [{"source":"/Users/yunai/logs/spring.log","offset":1721,"timestamp":"2020-01-01T16:03:03.687331+08:00","ttl":-1,"type":"log","meta":null,"FileStateOS":{"inode":102842596,"device":16777220}}]
 ```
 
-
-
 - 这里 `offset` 就是采集日志文件的位置。
 
 我们使用 [Elasticsearch Head](https://chrome.google.com/webstore/detail/elasticsearch-head/ffmkiejjmecolpfloofpjologoblkegm) ，查看到日志文件的日志，已经存储到 Elasticsearch 中。如下图所示：![Elasticsearch Head 查看日志数据](ELK(Elasticsearch + Logstash + Kibana) 极简入门.assets/05.png)
+
+
 
 ## 5. Kibana 搭建
 
@@ -390,13 +337,15 @@ output.logstash:
 >
 > ![简单直观地构建可视化](ELK(Elasticsearch + Logstash + Kibana) 极简入门.assets/dbfc86d62222dad6c6cb58bacdf7b0c7)
 
+
+
+
+
 ### 5.1 下载
 
 打开 [Kibana 下载页面](https://www.elastic.co/cn/downloads/kibana)，选择想要的 Kibana 版本。这里，我们选择 `7.5.1` 最新版本。
 
-
-
-```
+```bash
 # 创建目录
 $ mkdir -p /Users/yunai/Kibana
 $ cd /Users/yunai/Kibana
@@ -427,15 +376,13 @@ $ ls- ls
    0 drwxr-xr-x@    9 yunai  staff      288 Jan  1 23:52 x-pack
 ```
 
-
-
 因为 Kibana 软件包比较大，所以下载可能比较久。
+
+
 
 ### 5.2 配置文件
 
 使用 `vi config/kibana.yml` 命令，编辑 Kibana 配置文件。主要修改如下行：
-
-
 
 ```
 server.port: 5601
@@ -444,9 +391,9 @@ elasticsearch.hosts: ["http://localhost:9200"]
 kibana.index: ".kibana"
 ```
 
-
-
 - 如上四个配置项，实际配置文件里都已经有了，只需要将 `#` 注释去掉即可。
+
+
 
 ### 5.3 启动
 
@@ -455,6 +402,8 @@ kibana.index: ".kibana"
 可以通过 `nohup.out` 日志，查看启动是否成功。
 
 同时，我们可以使用浏览器，访问 <http://127.0.0.1:5601/> 地址，进一步判断 Kibana 是否启动成功。界面如下：![Kibana 界面](ELK(Elasticsearch + Logstash + Kibana) 极简入门.assets/02.png)
+
+
 
 ### 5.4 简单使用
 
@@ -479,6 +428,8 @@ kibana.index: ".kibana"
 ② 在「UptimeIndexPattern」下拉框，选择 `filebeat-7.5.1-*` 选项。在「时间范围」下拉框，选择近 15 天。如下图所示：![Discover 界面 2](ELK(Elasticsearch + Logstash + Kibana) 极简入门.assets/12.png)
 
 至此，我们完成了使用 Kibana 对[「4. Beatas 搭建」](https://www.iocoder.cn/Elasticsearch/ELK-install/?self#)收集的日志文件的日志的查询。美滋滋~
+
+
 
 ## 6. 消息队列的集成
 
@@ -542,7 +493,7 @@ kibana.index: ".kibana"
 
 在 [《芋道 Spring Boot 日志服务 ELK 入门》](http://www.iocoder.cn/Spring-Boot/ELK/?self) 中，我们来详细学习如何在 Spring Boot 中，整合并使用 ELK 收集日志。
 
-## 666. 参考
+##  参考
 
 本文更多的是以入门为主，更多配置示例，可以参考 <https://github.com/ameizi/ELK> 项目。其提供了收集 Tomcat、Nginx、MySQL 等等日志收集的示例。
 
